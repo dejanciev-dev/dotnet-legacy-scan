@@ -35,7 +35,8 @@ public sealed record Rule(
     bool SolutionWide = false);
 
 /// <summary>One location where a rule matched.</summary>
-public sealed record Occurrence(string File, int Line, string Snippet);
+/// <param name="FromSource">The snippet is a line of the scanned code (hidden with --no-snippets), not text made by the tool.</param>
+public sealed record Occurrence(string File, int Line, string Snippet, bool FromSource = false);
 
 /// <summary>A rule that matched in a project, with all its occurrences.</summary>
 public sealed class Finding
@@ -85,8 +86,17 @@ public sealed class ScanReport
 
     public int TotalLoc => Projects.Sum(p => p.LinesOfCode);
 
+    /// <summary>Blocker rules across all projects, most expensive first.</summary>
+    public List<(Rule Rule, int Count, List<string> ProjectNames)> BlockerGroups() =>
+        Projects
+            .SelectMany(p => p.Findings.Where(f => f.Rule.Severity == Severity.Blocker).Select(f => (p, f)))
+            .GroupBy(x => x.f.Rule)
+            .OrderByDescending(g => g.Sum(x => x.f.EstimatedHours))
+            .Select(g => (g.Key, g.Sum(x => x.f.Count), g.Select(x => x.p.Name).Distinct().ToList()))
+            .ToList();
+
     /// <summary>Package version including prerelease (0.2.0-beta.1), without the "+commit" build metadata.</summary>
-    private static string GetToolVersion()
+    internal static string GetToolVersion()
     {
         var assembly = typeof(ScanReport).Assembly;
         var informational = System.Reflection.CustomAttributeExtensions
@@ -101,4 +111,8 @@ public sealed class ReportOptions
     public string? Brand { get; set; }
     public string? Contact { get; set; }
     public double HoursPerDay { get; set; } = 6;
+    /// <summary>False with --no-snippets: lines of the scanned code are left out so the report can be shared.</summary>
+    public bool IncludeSnippets { get; set; } = true;
+
+    internal string? SnippetFor(Occurrence o) => o.FromSource && !IncludeSnippets ? null : o.Snippet;
 }

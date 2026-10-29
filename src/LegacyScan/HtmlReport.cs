@@ -49,19 +49,12 @@ public static class HtmlReport
         foreach (var w in r.Warnings) sb.Append($"<p class=\"warn\">⚠ {E(w)}</p>");
 
         // ---------- Key blockers ----------
-        var blockerGroups = r.Projects
-            .SelectMany(p => p.Findings.Where(f => f.Rule.Severity == Severity.Blocker).Select(f => (p, f)))
-            .GroupBy(x => x.f.Rule)
-            .OrderByDescending(g => g.Sum(x => x.f.EstimatedHours))
-            .ToList();
+        var blockerGroups = r.BlockerGroups();
         if (blockerGroups.Count > 0)
         {
             sb.Append("<section><h2>What makes this migration hard</h2><ul class=\"blockers\">");
-            foreach (var g in blockerGroups)
-            {
-                var count = g.Sum(x => x.f.Count);
-                sb.Append($"<li><strong>{E(g.Key.Title)}</strong> <span class=\"muted\">×{count} in {E(string.Join(", ", g.Select(x => x.p.Name).Distinct()))}</span><p>{E(g.Key.Guidance)}</p></li>");
-            }
+            foreach (var (rule, count, projects) in blockerGroups)
+                sb.Append($"<li><strong>{E(rule.Title)}</strong> <span class=\"muted\">×{count} in {E(string.Join(", ", projects))}</span><p>{E(rule.Guidance)}</p></li>");
             sb.Append("</ul></section>");
         }
 
@@ -113,7 +106,10 @@ public static class HtmlReport
                 {
                     sb.Append("<ul class=\"occ\">");
                     foreach (var oc in f.Occurrences.Take(MaxOccurrencesShown))
-                        sb.Append($"<li><code>{E(oc.File)}{(oc.Line > 1 ? ":" + oc.Line : "")}</code> {(oc.Snippet != Path.GetFileName(oc.File) ? $"<span class=\"snip\">{E(oc.Snippet)}</span>" : "")}</li>");
+                    {
+                        var snippet = o.SnippetFor(oc);
+                        sb.Append($"<li><code>{E(oc.File)}{(oc.Line > 1 ? ":" + oc.Line : "")}</code> {(snippet is not null && snippet != Path.GetFileName(oc.File) ? $"<span class=\"snip\">{E(snippet)}</span>" : "")}</li>");
+                    }
                     if (f.Occurrences.Count > MaxOccurrencesShown) sb.Append($"<li class=\"muted\">… and {f.Occurrences.Count - MaxOccurrencesShown} more</li>");
                     sb.Append("</ul>");
                 }
@@ -129,7 +125,7 @@ public static class HtmlReport
             <p>dotnet-legacy-scan reads project files, configuration, NuGet packages and source code (comments and strings excluded) and matches them against {{Rules.All.Count()}} migration rules.
             Each rule carries a heuristic effort; solution-wide concerns such as moving users to ASP.NET Core Identity or replacing the reporting platform are charged once, not per project. Totals add {{Estimator.BaseHoursPerProject}}h per project and {{(Estimator.TestingOverhead * 100).ToString("0", CultureInfo.InvariantCulture)}}% for regression testing; the range is ×{{Estimator.LowFactor.ToString(CultureInfo.InvariantCulture)}} to ×{{Estimator.HighFactor.ToString(CultureInfo.InvariantCulture)}}.
             It is a starting point for planning, not a quote. UI redesign, new features, infrastructure and deployment changes are not included.</p>
-            <p>The scan runs locally and read-only. No code leaves the machine.</p>
+            <p>The scan runs locally and read-only. No code leaves the machine.{{(o.IncludeSnippets ? "" : " Source code lines are left out of this report (--no-snippets).")}}</p>
             </section>
             """);
 

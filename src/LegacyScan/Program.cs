@@ -15,11 +15,15 @@ internal static class Cli
         Options:
           -o, --out <file>     HTML report path (default: legacy-scan-report.html)
           --json <file>        Also write a JSON report
+          --md <file>          Also write a Markdown summary (e.g. "$GITHUB_STEP_SUMMARY" in GitHub Actions)
+          --exclude <pattern>  Skip projects whose name or relative path matches (* and ?); repeatable
+          --no-snippets        Leave source code lines out of the reports (safe to share)
           --brand <text>       Name shown in the report footer (e.g. your company)
           --contact <text>     Contact shown in the report footer (email or URL)
           --hours-per-day <n>  Productive hours per developer day (default: 6)
           --fail-on <level>    Exit with code 2 if a finding of this severity exists (minor|major|blocker)
           -q, --quiet          No console summary
+          --version            Show the version
           -h, --help           Show help
 
         Nothing leaves your machine: the scan is local and read-only.
@@ -32,8 +36,14 @@ internal static class Cli
             Console.WriteLine(Usage);
             return args.Length == 0 ? 1 : 0;
         }
+        if (args.Contains("--version"))
+        {
+            Console.WriteLine(ScanReport.GetToolVersion());
+            return 0;
+        }
 
-        string? input = null, html = "legacy-scan-report.html", json = null;
+        string? input = null, html = "legacy-scan-report.html", json = null, md = null;
+        var exclude = new List<string>();
         var options = new ReportOptions();
         Severity? failOn = null;
         var quiet = false;
@@ -47,6 +57,9 @@ internal static class Cli
                 {
                     case "-o" or "--out": html = Next(); break;
                     case "--json": json = Next(); break;
+                    case "--md": md = Next(); break;
+                    case "--exclude": exclude.Add(Next()); break;
+                    case "--no-snippets": options.IncludeSnippets = false; break;
                     case "--brand": options.Brand = Next(); break;
                     case "--contact": options.Contact = Next(); break;
                     case "--hours-per-day":
@@ -64,7 +77,7 @@ internal static class Cli
             }
             if (input is null) throw new ArgumentException("Missing <path>");
 
-            var report = Scanner.Scan(input);
+            var report = Scanner.Scan(input, exclude);
             if (report.Projects.Count == 0)
             {
                 // An empty report would say "Difficulty: None, 0 days", which reads like good news.
@@ -74,8 +87,9 @@ internal static class Cli
             }
             File.WriteAllText(html, HtmlReport.Render(report, options));
             if (json is not null) File.WriteAllText(json, JsonReport.Render(report, options));
+            if (md is not null) File.WriteAllText(md, MarkdownReport.Render(report, options));
 
-            if (!quiet) PrintSummary(report, options, html, json);
+            if (!quiet) PrintSummary(report, options, html, json, md);
 
             if (failOn is { } level && report.Projects.SelectMany(p => p.Findings).Any(f => f.Rule.Severity >= level)) return 2;
             return 0;
@@ -94,7 +108,7 @@ internal static class Cli
         }
     }
 
-    private static void PrintSummary(ScanReport r, ReportOptions o, string html, string? json)
+    private static void PrintSummary(ScanReport r, ReportOptions o, string html, string? json, string? md)
     {
         Console.WriteLine();
         Console.WriteLine($"  Projects:     {r.Projects.Count} ({r.Projects.Count(p => p.IsModernAlready)} already modern)");
@@ -106,6 +120,7 @@ internal static class Cli
         Console.WriteLine();
         Console.WriteLine($"  Report:       {Path.GetFullPath(html)}");
         if (json is not null) Console.WriteLine($"  JSON:         {Path.GetFullPath(json)}");
+        if (md is not null) Console.WriteLine($"  Markdown:     {Path.GetFullPath(md)}");
         Console.WriteLine();
     }
 

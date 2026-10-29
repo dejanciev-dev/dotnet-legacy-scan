@@ -58,7 +58,7 @@ public static class JsonReport
                 count = f.Occurrences.Count,
                 f.EstimatedHours,
                 f.Rule.Guidance,
-                occurrences = f.Occurrences,
+                occurrences = f.Occurrences.Select(oc => new { oc.File, oc.Line, snippet = o.SnippetFor(oc) }),
             }),
         }),
     }, Options);

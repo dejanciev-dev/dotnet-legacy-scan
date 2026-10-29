@@ -65,6 +65,13 @@ internal static class Cli
             if (input is null) throw new ArgumentException("Missing <path>");
 
             var report = Scanner.Scan(input);
+            if (report.Projects.Count == 0)
+            {
+                // An empty report would say "Difficulty: None, 0 days", which reads like good news.
+                foreach (var w in report.Warnings) Console.Error.WriteLine($"warning: {w}");
+                Console.Error.WriteLine("error: no project could be analyzed, so no report was written.");
+                return 1;
+            }
             File.WriteAllText(html, HtmlReport.Render(report, options));
             if (json is not null) File.WriteAllText(json, JsonReport.Render(report, options));
 
@@ -102,5 +109,5 @@ internal static class Cli
         Console.WriteLine();
     }
 
-    internal static string Days(double hours, ReportOptions o) => Math.Ceiling(hours / o.HoursPerDay).ToString("N0");
+    internal static string Days(double hours, ReportOptions o) => Math.Ceiling(hours / o.HoursPerDay).ToString("N0", System.Globalization.CultureInfo.InvariantCulture);
 }

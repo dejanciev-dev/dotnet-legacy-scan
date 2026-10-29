@@ -9,6 +9,9 @@ public static class Scanner
         if (projects.Count == 0) report.Warnings.Add("No .csproj or .vbproj projects found.");
 
         var rootDir = Directory.Exists(report.Input) ? report.Input : Path.GetDirectoryName(report.Input)!;
+        foreach (var shared in projects.GroupBy(p => Path.GetDirectoryName(p)!, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1))
+            report.Warnings.Add($"{string.Join(" and ", shared.Select(Path.GetFileName))} share the folder {Path.GetRelativePath(rootDir, shared.Key)}; its files are counted for each of them.");
+
         foreach (var path in projects)
         {
             try

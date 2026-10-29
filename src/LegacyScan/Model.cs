@@ -23,6 +23,7 @@ public enum ProjectKind
 }
 
 /// <summary>A rule from the catalogue (see <see cref="Rules"/>).</summary>
+/// <param name="SolutionWide">Base hours are a one-off for the whole solution (e.g. moving users to Identity), not per project.</param>
 public sealed record Rule(
     string Id,
     string Title,
@@ -30,7 +31,8 @@ public sealed record Rule(
     string Category,
     double BaseHours,
     double HoursPerOccurrence,
-    string Guidance);
+    string Guidance,
+    bool SolutionWide = false);
 
 /// <summary>One location where a rule matched.</summary>
 public sealed record Occurrence(string File, int Line, string Snippet);
@@ -41,7 +43,9 @@ public sealed class Finding
     public required Rule Rule { get; init; }
     public List<Occurrence> Occurrences { get; } = [];
     public int Count => Math.Max(1, Occurrences.Count);
-    public double EstimatedHours => Rule.BaseHours + Rule.HoursPerOccurrence * Count;
+    /// <summary>False when a solution-wide rule's base hours are already charged to another project.</summary>
+    public bool ChargeBaseHours { get; set; } = true;
+    public double EstimatedHours => (ChargeBaseHours ? Rule.BaseHours : 0) + Rule.HoursPerOccurrence * Count;
 }
 
 public sealed class ProjectReport
@@ -70,7 +74,7 @@ public sealed class ScanReport
 {
     public required string Input { get; init; }
     public DateTimeOffset ScannedAt { get; init; } = DateTimeOffset.Now;
-    public string ToolVersion { get; init; } = typeof(ScanReport).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
+    public string ToolVersion { get; init; } = GetToolVersion();
     public List<ProjectReport> Projects { get; } = [];
     public List<string> MigrationOrder { get; set; } = [];
     public double EstimatedHoursLow { get; set; }
@@ -80,6 +84,15 @@ public sealed class ScanReport
     public List<string> Warnings { get; } = [];
 
     public int TotalLoc => Projects.Sum(p => p.LinesOfCode);
+
+    /// <summary>Package version including prerelease (0.2.0-beta.1), without the "+commit" build metadata.</summary>
+    private static string GetToolVersion()
+    {
+        var assembly = typeof(ScanReport).Assembly;
+        var informational = System.Reflection.CustomAttributeExtensions
+            .GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(assembly)?.InformationalVersion;
+        return informational?.Split('+')[0] ?? assembly.GetName().Version?.ToString(3) ?? "0.0.0";
+    }
     public int CountBySeverity(Severity s) => Projects.SelectMany(p => p.Findings).Count(f => f.Rule.Severity == s);
 }
 

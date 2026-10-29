@@ -23,7 +23,7 @@ public static partial class ProjectAnalyzer
 
     private sealed class Inventory
     {
-        public readonly List<string> Aspx = [], Ascx = [], Master = [], Svc = [], Asmx = [], Views = [], Edmx = [], Workflows = [], ServiceRefs = [], Configs = [];
+        public readonly List<string> Aspx = [], Ascx = [], Master = [], Svc = [], Asmx = [], Views = [], Edmx = [], Workflows = [], ServiceRefs = [], Configs = [], Reports = [];
         public string? GlobalAsax;
         public readonly List<string> Sources = [];
     }
@@ -136,6 +136,7 @@ public static partial class ProjectAnalyzer
         AddFiles(findings, Rules.Asmx, inv.Asmx, dir);
         AddFiles(findings, Rules.Edmx, inv.Edmx, dir);
         AddFiles(findings, Rules.WcfClient, inv.ServiceRefs, dir);
+        AddFiles(findings, Rules.Reporting, inv.Reports, dir);
         if (inv.Workflows.Count > 0 || typeGuids.Contains(TypeGuids.Workflow) || HasRef("System.Activities")) AddFiles(findings, Rules.Workflow, inv.Workflows, dir, ensure: true);
         if (inv.GlobalAsax is not null) CodeScanner.Add(findings, Rules.GlobalAsax, new Occurrence(Path.GetRelativePath(dir, inv.GlobalAsax), 1, "Global.asax"));
 
@@ -143,7 +144,7 @@ public static partial class ProjectAnalyzer
         {
             var f = new Finding { Rule = Rules.Mvc5 };
             f.Occurrences.AddRange(inv.Sources
-                .Where(s => Path.GetFileNameWithoutExtension(s).EndsWith("Controller", StringComparison.OrdinalIgnoreCase) && !File.ReadAllText(s).Contains("ApiController"))
+                .Where(s => Path.GetFileNameWithoutExtension(s).EndsWith("Controller", StringComparison.OrdinalIgnoreCase) && !ReadOrEmpty(s).Contains("ApiController"))
                 .Select(s => new Occurrence(Path.GetRelativePath(dir, s), 1, "controller")));
             findings[Rules.Mvc5] = f;
             AddFiles(findings, Rules.MvcViews, inv.Views, dir);
@@ -151,7 +152,7 @@ public static partial class ProjectAnalyzer
         if (report.Kind == ProjectKind.WebApi || (report.Kind == ProjectKind.AspNetMvc && (HasRef("System.Web.Http") || HasRef("Microsoft.AspNet.WebApi"))))
         {
             var f = new Finding { Rule = Rules.WebApi2 };
-            f.Occurrences.AddRange(inv.Sources.Where(s => File.ReadAllText(s).Contains("ApiController"))
+            f.Occurrences.AddRange(inv.Sources.Where(s => ReadOrEmpty(s).Contains("ApiController"))
                 .Select(s => new Occurrence(Path.GetRelativePath(dir, s), 1, "ApiController")));
             findings[Rules.WebApi2] = f;
         }
@@ -219,7 +220,8 @@ public static partial class ProjectAnalyzer
     {
         string[] files;
         try { files = Directory.GetFiles(dir); }
-        catch (UnauthorizedAccessException) { return; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return; }
+        Array.Sort(files, StringComparer.OrdinalIgnoreCase); // same report order on Windows and Linux
 
         // Another project nested below this one owns its own folder.
         if (!isRoot && files.Any(f => f.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".vbproj", StringComparison.OrdinalIgnoreCase))) return;
@@ -245,13 +247,20 @@ public static partial class ProjectAnalyzer
                     // only the base config, not Web.Debug.config transforms
                     if (name.Count(ch => ch == '.') == 1) inv.Configs.Add(f);
                     break;
-                case ".svcmap": inv.ServiceRefs.Add(f); break;
+                case ".svcmap" or ".discomap": inv.ServiceRefs.Add(f); break;
+                case ".map" when name.Equals("Reference.map", StringComparison.OrdinalIgnoreCase): inv.ServiceRefs.Add(f); break; // ASMX Web Reference
+                case ".rpt" or ".rdlc": inv.Reports.Add(f); break;
                 case ".json" when name.Equals("ConnectedService.json", StringComparison.OrdinalIgnoreCase): inv.ServiceRefs.Add(f); break;
             }
         }
-        foreach (var sub in Directory.GetDirectories(dir))
-            if (!SolutionReader.IgnoredDirs.Contains(Path.GetFileName(sub)))
-                Walk(sub, projectDir, inv, isRoot: false);
+        foreach (var sub in SolutionReader.SubDirectories(dir))
+            Walk(sub, projectDir, inv, isRoot: false);
+    }
+
+    private static string ReadOrEmpty(string path)
+    {
+        try { return File.ReadAllText(path); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return ""; }
     }
 
     private static bool IsWorkflowXaml(string path)
@@ -264,7 +273,7 @@ public static partial class ProjectAnalyzer
             var s = new string(head, 0, n);
             return s.Contains("<Activity", StringComparison.Ordinal) || s.Contains("schemas.microsoft.com/netfx/2009/xaml/activities", StringComparison.Ordinal);
         }
-        catch (IOException) { return false; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return false; }
     }
 
     private static void AnalyzeConfig(string path, string rel, Dictionary<Rule, Finding> findings, Inventory inv)
@@ -275,11 +284,17 @@ public static partial class ProjectAnalyzer
 
         int Line(XElement e) => ((System.Xml.IXmlLineInfo)e).LineNumber;
         IEnumerable<XElement> D(string n) => doc.Descendants().Where(e => e.Name.LocalName == n);
+        IEnumerable<XElement> SystemWeb(string n) => D(n).Where(e => e.Ancestors().Any(a => a.Name.LocalName == "system.web"));
 
-        foreach (var m in D("membership").Concat(D("roleManager").Where(e => (string?)e.Attribute("enabled") == "true")).Concat(D("profile")))
+        var providers = SystemWeb("membership")
+            .Concat(SystemWeb("roleManager").Where(e => string.Equals((string?)e.Attribute("enabled"), "true", StringComparison.OrdinalIgnoreCase)))
+            .Concat(SystemWeb("profile"))
+            .ToList();
+        foreach (var m in providers)
             CodeScanner.Add(findings, Rules.MembershipAuth, new Occurrence(rel, Line(m), $"<{m.Name.LocalName}>"));
-        foreach (var a in D("authentication").Where(e => string.Equals((string?)e.Attribute("mode"), "Forms", StringComparison.OrdinalIgnoreCase)))
-            CodeScanner.Add(findings, Rules.MembershipAuth, new Occurrence(rel, Line(a), "<authentication mode=\"Forms\">"));
+        // Forms auth on its own (custom login) is a much smaller job than moving Membership users to Identity.
+        foreach (var a in SystemWeb("authentication").Where(e => string.Equals((string?)e.Attribute("mode"), "Forms", StringComparison.OrdinalIgnoreCase)))
+            CodeScanner.Add(findings, providers.Count > 0 ? Rules.MembershipAuth : Rules.FormsAuth, new Occurrence(rel, Line(a), "<authentication mode=\"Forms\">"));
 
         foreach (var s in D("sessionState"))
         {

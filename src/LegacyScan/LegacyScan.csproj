@@ -18,7 +18,7 @@
     <RepositoryType>git</RepositoryType>
     <PackageProjectUrl>https://github.com/dejanciev-dev/dotnet-legacy-scan</PackageProjectUrl>
     <Version>0.1.0</Version>
-    <Authors>Dejan</Authors>
+    <Authors>Dejan Ciev</Authors>
     <Description>Scans .NET Framework solutions and produces a migration readiness report (blockers, effort estimate, recommended order) for moving to modern .NET.</Description>
     <PackageTags>dotnet;migration;modernization;webforms;wcf;net-framework;upgrade</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>

@@ -8,10 +8,10 @@ public static class Rules
 {
     // ---------- Project format ----------
     public static readonly Rule LegacyProjectFormat = new("PRJ001", "Legacy (non-SDK) project format", Severity.Minor, "Project",
-        2, 0, "Convert to SDK-style csproj (try-convert or by hand). Do this first; it makes every later step easier and can be done while still targeting net48.");
+        2, 0, "Convert to SDK-style csproj (by hand or with Microsoft's upgrade tooling). Do this first; it makes every later step easier and can be done while still targeting net48.");
 
     public static readonly Rule PackagesConfig = new("PRJ002", "packages.config NuGet format", Severity.Minor, "Project",
-        1, 0, "Migrate to PackageReference (Visual Studio: right-click packages.config → Migrate). Review transitive dependencies afterwards.");
+        1, 0, "Migrate to PackageReference (Visual Studio: right-click packages.config → Migrate; not offered for ASP.NET web projects, convert those by hand or as part of the SDK-style conversion). Review transitive dependencies afterwards.");
 
     public static readonly Rule OldFramework = new("PRJ003", "Targets an old .NET Framework version (< 4.7.2)", Severity.Minor, "Project",
         2, 0, "Retarget to net48 first. It gives netstandard2.0 compatibility and lets you share libraries with the new .NET app during an incremental migration.");
@@ -48,19 +48,22 @@ public static class Rules
         4, 6, "Not supported on modern .NET. Re-implement as Web API endpoints or host with CoreWCF (basicHttpBinding) to keep the SOAP contract for existing clients.");
 
     public static readonly Rule Workflow = new("APP011", "Windows Workflow Foundation", Severity.Blocker, "Services",
-        24, 8, "WF is not supported on modern .NET. Consider CoreWF (community port) or redesign with a workflow/orchestration library.");
+        24, 8, "WF is not supported on modern .NET. Consider CoreWF (community port) or redesign with a workflow/orchestration library.", SolutionWide: true);
 
     public static readonly Rule DesktopApp = new("APP012", "Desktop UI (WinForms / WPF)", Severity.Minor, "Desktop",
         8, 0, "Supported on net10.0-windows. Check third-party control suites, designer files, ClickOnce deployment and app.config settings.");
 
     // ---------- Platform features ----------
     public static readonly Rule MembershipAuth = new("SEC001", "ASP.NET Membership / Forms Authentication / Roles", Severity.Blocker, "Security",
-        24, 0, "Move to ASP.NET Core Identity (or an external IdP). Plan the user/password-hash data migration and keep a compatible password hasher so users do not need to reset passwords.");
+        24, 0, "Move to ASP.NET Core Identity (or an external IdP). Plan the user/password-hash data migration and keep a compatible password hasher so users do not need to reset passwords.", SolutionWide: true);
 
     public static readonly Rule AspNetIdentity2 = new("SEC002", "ASP.NET Identity 2 / OWIN auth", Severity.Major, "Security",
-        12, 0, "Move to ASP.NET Core Identity. Schema is similar but not identical; plan a migration script.");
+        12, 0, "Move to ASP.NET Core Identity. Schema is similar but not identical; plan a migration script.", SolutionWide: true);
 
-    public static readonly Rule SessionState = new("WEB001", "Out-of-process or heavy Session state", Severity.Major, "Web",
+    public static readonly Rule FormsAuth = new("SEC003", "Forms Authentication with custom login (no Membership provider)", Severity.Major, "Security",
+        6, 0, "Replace with ASP.NET Core cookie authentication and port the login code (FormsAuthentication.* calls). During incremental migration, System.Web adapters can share authentication between the old and new app.", SolutionWide: true);
+
+    public static readonly Rule SessionState = new("WEB001", "ASP.NET Session state (usage or out-of-process mode)", Severity.Major, "Web",
         6, 0.25, "ASP.NET Core session is different (no SQLServer/StateServer modes, values are byte[]). During incremental migration share session via System.Web adapters.");
 
     public static readonly Rule Edmx = new("DATA001", "Entity Framework EDMX model (database-first designer)", Severity.Major, "Data",
@@ -73,7 +76,7 @@ public static class Rules
         0, 0.1, "Switch to Microsoft.Data.SqlClient (note: Encrypt=true is the default, which may require TrustServerCertificate or proper certificates).");
 
     public static readonly Rule Reporting = new("RPT001", "Crystal Reports / ReportViewer", Severity.Blocker, "Reporting",
-        16, 4, "No direct support on modern .NET web. Options: keep a small .NET Framework reporting service, move to SSRS/Power BI embedding, or a .NET reporting library.");
+        16, 4, "No direct support on modern .NET web. Options: keep a small .NET Framework reporting service, move to SSRS/Power BI embedding, or a .NET reporting library.", SolutionWide: true);
 
     // ---------- Code patterns ----------
     public static readonly Rule HttpContextCurrent = new("CODE001", "HttpContext.Current (static access)", Severity.Major, "Code",
@@ -92,7 +95,7 @@ public static class Rules
         0, 2, "Throws PlatformNotSupportedException. Use CancellationToken-based cooperative cancellation.");
 
     public static readonly Rule EnterpriseServices = new("CODE006", "System.EnterpriseServices (COM+)", Severity.Blocker, "Code",
-        16, 4, "Not supported. Redesign transactional components; for distributed transactions see System.Transactions (Windows only on .NET 7+).");
+        16, 4, "Not supported. Redesign transactional components; for distributed transactions see System.Transactions (Windows only on .NET 7+).", SolutionWide: true);
 
     public static readonly Rule CodeAccessSecurity = new("CODE007", "Code Access Security (CAS) APIs", Severity.Minor, "Code",
         0, 0.25, "CAS is not supported; remove the attributes/calls (they are no-ops or throw).");
@@ -146,6 +149,7 @@ public static class Rules
         new("Elmah", PackageNeedsReplacement, "→ ILogger + Serilog/Seq/Application Insights"),
         new("DotNetOpenAuth", PackageNeedsReplacement, "→ ASP.NET Core authentication handlers"),
         new("Microsoft.ReportViewer", Reporting, "ReportViewer controls"),
+        new("Microsoft.ReportingServices.ReportViewerControl", Reporting, "ReportViewer controls", Family: "Microsoft.ReportViewer"),
         new("CrystalDecisions", Reporting, "Crystal Reports"),
         new("Ninject.Web", PackageNeedsUpgrade, "→ Microsoft.Extensions.DependencyInjection or Ninject core"),
         new("Autofac.Mvc", PackageNeedsUpgrade, "→ Autofac.Extensions.DependencyInjection", Family: "Autofac"),

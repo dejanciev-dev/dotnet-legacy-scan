@@ -22,7 +22,8 @@ public static class CodeScanner
         new(Rules.SystemWebInLibrary, R(@"^\s*(using|Imports)\s+System\.Web\b"), IsNonWeb),
         new(Rules.BinaryFormatter, R(@"\b(BinaryFormatter|NetDataContractSerializer|SoapFormatter)\b")),
         new(Rules.RemotingAppDomain, R(@"\bAppDomain\.CreateDomain\b|\bSystem\.Runtime\.Remoting\b|\bRemotingConfiguration\b|(:|Inherits)\s*MarshalByRefObject\b")),
-        new(Rules.ThreadAbort, R(@"\bThread\.CurrentThread\.(Abort|Suspend|Resume)\b|\b\w*[Tt]hread\w*\.(Abort|Suspend|Resume)\s*\(\s*\)")),
+        // Only receivers named like a thread ("_workerThread", "thread2"): worker.Abort() is missed to avoid HttpWebRequest/ThreadPool false positives.
+        new(Rules.ThreadAbort, R(@"\bThread\.CurrentThread\.(Abort|Suspend|Resume)\b|\b\w*[Tt]hread\d*\.(Abort|Suspend|Resume)\s*\(\s*\)")),
         new(Rules.EnterpriseServices, R(@"\bSystem\.EnterpriseServices\b|\bServicedComponent\b")),
         new(Rules.CodeAccessSecurity, R(@"[\[<]\s*(assembly:\s*)?(SecurityPermission|FileIOPermission|ReflectionPermission|PermissionSet|AllowPartiallyTrustedCallers)\b|\bnew\s+(PermissionSet|SecurityPermission|FileIOPermission)\s*\(")),
         new(Rules.WebClientObsolete, R(@"\bnew\s+WebClient\b|\bWebRequest\.Create\b|\bHttpWebRequest\b")),
@@ -33,20 +34,33 @@ public static class CodeScanner
         new(Rules.SystemDataSqlClient, R(@"\bSystem\.Data\.SqlClient\b")),
         new(Rules.HttpModulesHandlers, R(@"(:|Implements)\s*([\w.]+\s*,\s*)*(IHttpModule|IHttpHandler|IHttpAsyncHandler)\b")),
         new(Rules.WcfClient, R(@"\bClientBase\s*(<|\(Of)|\bChannelFactory\s*(<|\(Of)")),
-        new(Rules.SessionState, R(@"\bSession\s*\[|\bHttpContext\.Current\.Session\b")),
+        // Session[...] on the page/controller, not someObject.Session[...]
+        new(Rules.SessionState, R(@"(?<![\w.])Session\s*(\[|\.(Add|Remove|Abandon|Clear|Contents)\b)|\b(HttpContext\.Current|Context|Page|this)\.Session\b")),
     ];
+
+    /// <summary>Designer and service-reference code is generated: counted as lines, not scanned for patterns.</summary>
+    internal static bool IsGenerated(string relPath)
+    {
+        var name = Path.GetFileName(relPath);
+        if (name.EndsWith(".Designer.cs", StringComparison.OrdinalIgnoreCase) || name.EndsWith(".Designer.vb", StringComparison.OrdinalIgnoreCase)
+            || name.EndsWith(".g.cs", StringComparison.OrdinalIgnoreCase) || name.EndsWith(".g.i.cs", StringComparison.OrdinalIgnoreCase))
+            return true;
+        return relPath.Split('/', '\\').Any(d => d.Equals("Service References", StringComparison.OrdinalIgnoreCase)
+            || d.Equals("Web References", StringComparison.OrdinalIgnoreCase) || d.Equals("Connected Services", StringComparison.OrdinalIgnoreCase));
+    }
 
     /// <summary>Scans one file and adds occurrences to the per-rule dictionary.</summary>
     public static void ScanFile(string path, string relPath, ProjectReport project, Dictionary<Rule, Finding> findings)
     {
         string text;
         try { text = File.ReadAllText(path); }
-        catch (IOException) { return; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return; }
 
         var isVb = path.EndsWith(".vb", StringComparison.OrdinalIgnoreCase);
         var original = text.Split('\n');
         var lines = (isVb ? StripVb(text) : StripCSharp(text)).Split('\n');
         project.LinesOfCode += original.Count(l => !string.IsNullOrWhiteSpace(l));
+        if (IsGenerated(relPath)) return;
 
         foreach (var pattern in Patterns)
         {
@@ -69,11 +83,22 @@ public static class CodeScanner
 
     private static string Truncate(string s, int max) => s.Length <= max ? s : s[..max] + "…";
 
-    /// <summary>Blanks C# comments, strings and chars, keeping newlines so line numbers stay valid.</summary>
+    /// <summary>
+    /// Blanks C# comments, strings and chars, keeping newlines so line numbers stay valid.
+    /// Code inside interpolation holes (<c>$"{HttpContext.Current.User}"</c>) is kept.
+    /// </summary>
     public static string StripCSharp(string s)
     {
         var sb = new StringBuilder(s.Length);
         var i = 0;
+        StripCode(s, ref i, sb, inHole: false);
+        return sb.ToString();
+    }
+
+    /// <summary>Copies code, blanking comments and literals. In an interpolation hole, stops at the closing '}' (not consumed).</summary>
+    private static void StripCode(string s, ref int i, StringBuilder sb, bool inHole)
+    {
+        var depth = 0;
         while (i < s.Length)
         {
             var c = s[i];
@@ -85,38 +110,12 @@ public static class CodeScanner
             else if (c == '/' && next == '*')
             {
                 sb.Append("  "); i += 2;
-                while (i < s.Length && !(s[i] == '*' && i + 1 < s.Length && s[i + 1] == '/')) { sb.Append(s[i] == '\n' ? '\n' : ' '); i++; }
+                while (i < s.Length && !(s[i] == '*' && i + 1 < s.Length && s[i + 1] == '/')) { sb.Append(Blank(s[i])); i++; }
                 if (i < s.Length) { sb.Append("  "); i += 2; }
             }
-            else if (c == '"' && i + 2 < s.Length && s[i + 1] == '"' && s[i + 2] == '"')
+            else if (c is '"' or '$' or '@' && IsStringStart(s, i))
             {
-                // raw string literal """ ... """
-                sb.Append("\"\"\""); i += 3;
-                while (i < s.Length && !(i + 2 < s.Length && s[i] == '"' && s[i + 1] == '"' && s[i + 2] == '"')) { sb.Append(s[i] == '\n' ? '\n' : ' '); i++; }
-                if (i < s.Length) { sb.Append("\"\"\""); i += 3; }
-                while (i < s.Length && s[i] == '"') { sb.Append('"'); i++; }
-            }
-            else if ((c == '@' && next == '"') || (c == '$' && next == '@' ) || (c == '@' && next == '$'))
-            {
-                // verbatim string (@"..", $@"..", @$"..") – "" is an escaped quote
-                while (i < s.Length && s[i] != '"') { sb.Append(s[i]); i++; }
-                sb.Append('"'); i++;
-                while (i < s.Length)
-                {
-                    if (s[i] == '"' && i + 1 < s.Length && s[i + 1] == '"') { sb.Append("  "); i += 2; continue; }
-                    if (s[i] == '"') { sb.Append('"'); i++; break; }
-                    sb.Append(s[i] == '\n' ? '\n' : ' '); i++;
-                }
-            }
-            else if (c == '"')
-            {
-                sb.Append('"'); i++;
-                while (i < s.Length && s[i] != '"' && s[i] != '\n')
-                {
-                    if (s[i] == '\\' && i + 1 < s.Length) { sb.Append("  "); i += 2; continue; }
-                    sb.Append(' '); i++;
-                }
-                if (i < s.Length && s[i] == '"') { sb.Append('"'); i++; }
+                StripString(s, ref i, sb);
             }
             else if (c == '\'' && i + 2 < s.Length && (s[i + 2] == '\'' || (s[i + 1] == '\\' && i + 3 < s.Length)))
             {
@@ -131,11 +130,75 @@ public static class CodeScanner
             }
             else
             {
+                if (inHole && c == '{') depth++;
+                else if (inHole && c == '}' && depth-- == 0) return;
                 sb.Append(c); i++;
             }
         }
-        return sb.ToString();
     }
+
+    private static bool IsStringStart(string s, int i)
+    {
+        while (i < s.Length && s[i] is '$' or '@') i++;
+        return i < s.Length && s[i] == '"';
+    }
+
+    /// <summary>Regular, verbatim (@), interpolated ($) and raw ("""…""", any number of quotes and $) string literals.</summary>
+    private static void StripString(string s, ref int i, StringBuilder sb)
+    {
+        var dollars = 0;
+        var verbatim = false;
+        for (; s[i] != '"'; i++)
+        {
+            if (s[i] == '$') dollars++; else verbatim = true;
+            sb.Append(s[i]);
+        }
+
+        var quotes = 0;
+        while (i + quotes < s.Length && s[i + quotes] == '"') quotes++;
+        if (quotes >= 3)
+        {
+            // raw string: closed by the same number of quotes; holes open with as many '{' as there are '$'
+            sb.Append('"', quotes); i += quotes;
+            while (i < s.Length)
+            {
+                if (IsRun(s, i, '"', quotes)) { sb.Append('"', quotes); i += quotes; return; }
+                if (dollars > 0 && IsRun(s, i, '{', dollars)) { Hole(s, ref i, sb, dollars); continue; }
+                sb.Append(Blank(s[i])); i++;
+            }
+            return;
+        }
+
+        sb.Append('"'); i++;
+        while (i < s.Length)
+        {
+            var c = s[i];
+            var next = i + 1 < s.Length ? s[i + 1] : '\0';
+            if (!verbatim && c == '\n') return; // unterminated: stop at end of line
+            if (verbatim && c == '"' && next == '"') { sb.Append("  "); i += 2; continue; }
+            if (c == '"') { sb.Append('"'); i++; return; }
+            if (!verbatim && c == '\\' && next != '\0') { sb.Append("  "); i += 2; continue; }
+            if (dollars > 0 && c is '{' or '}' && next == c) { sb.Append("  "); i += 2; continue; } // {{ }} escapes
+            if (dollars > 0 && c == '{') { Hole(s, ref i, sb, 1); continue; }
+            sb.Append(Blank(c)); i++;
+        }
+    }
+
+    private static void Hole(string s, ref int i, StringBuilder sb, int braces)
+    {
+        sb.Append('{', braces); i += braces;
+        StripCode(s, ref i, sb, inHole: true);
+        for (var k = 0; k < braces && i < s.Length && s[i] == '}'; k++) { sb.Append('}'); i++; }
+    }
+
+    private static bool IsRun(string s, int i, char c, int count)
+    {
+        if (i + count > s.Length) return false;
+        for (var k = 0; k < count; k++) if (s[i + k] != c) return false;
+        return true;
+    }
+
+    private static char Blank(char c) => c == '\n' ? '\n' : ' ';
 
     /// <summary>Blanks VB.NET comments (' and REM) and strings ("" escapes).</summary>
     public static string StripVb(string s)

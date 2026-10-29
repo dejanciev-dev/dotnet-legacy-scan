@@ -80,7 +80,7 @@ public static class HtmlReport
         // ---------- Projects table ----------
         sb.Append("""
             <section><h2>Projects</h2><div class="table-wrap"><table>
-            <thead><tr><th>Project</th><th>Type</th><th>Target</th><th>Format</th><th class="num">Lines</th><th>Worst</th><th class="num">Effort (days)</th></tr></thead><tbody>
+            <thead><tr><th>Project</th><th>Type</th><th>Target</th><th>Format</th><th class="num">Lines</th><th>Worst</th><th class="num">Base effort (days)</th></tr></thead><tbody>
             """);
         foreach (var p in r.Projects.OrderByDescending(p => p.EstimatedHours))
         {
@@ -89,7 +89,8 @@ public static class HtmlReport
                       $"<td class=\"num\">{p.LinesOfCode.ToString("N0", CultureInfo.InvariantCulture)}</td><td>{Badge(p.IsModernAlready && p.Findings.Count == 0 ? null : p.WorstSeverity)}</td>" +
                       $"<td class=\"num\">{(p.EstimatedHours > 0 ? Days(p.EstimatedHours) : "–")}</td></tr>");
         }
-        sb.Append("</tbody></table></div></section>");
+        sb.Append("</tbody></table></div>");
+        sb.Append($"<p class=\"muted small\">Base effort is the code work per project, before the {(Estimator.TestingOverhead * 100).ToString("0", CultureInfo.InvariantCulture)}% testing overhead and the uncertainty range used for the estimated effort above.</p></section>");
 
         // ---------- Details ----------
         sb.Append("<section><h2>Findings by project</h2>");
@@ -126,7 +127,7 @@ public static class HtmlReport
         sb.Append($$"""
             <section class="method"><h2>How this estimate is made</h2>
             <p>dotnet-legacy-scan reads project files, configuration, NuGet packages and source code (comments and strings excluded) and matches them against {{Rules.All.Count()}} migration rules.
-            Each rule carries a heuristic effort. Totals add {{Estimator.BaseHoursPerProject}}h per project and {{(Estimator.TestingOverhead * 100).ToString("0", CultureInfo.InvariantCulture)}}% for regression testing; the range is ×{{Estimator.LowFactor.ToString(CultureInfo.InvariantCulture)}} to ×{{Estimator.HighFactor.ToString(CultureInfo.InvariantCulture)}}.
+            Each rule carries a heuristic effort; solution-wide concerns such as moving users to ASP.NET Core Identity or replacing the reporting platform are charged once, not per project. Totals add {{Estimator.BaseHoursPerProject}}h per project and {{(Estimator.TestingOverhead * 100).ToString("0", CultureInfo.InvariantCulture)}}% for regression testing; the range is ×{{Estimator.LowFactor.ToString(CultureInfo.InvariantCulture)}} to ×{{Estimator.HighFactor.ToString(CultureInfo.InvariantCulture)}}.
             It is a starting point for planning, not a quote. UI redesign, new features, infrastructure and deployment changes are not included.</p>
             <p>The scan runs locally and read-only. No code leaves the machine.</p>
             </section>

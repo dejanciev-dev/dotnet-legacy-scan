@@ -14,6 +14,10 @@ public static class Estimator
 
     public static void Estimate(ScanReport report)
     {
+        // Solution-wide concerns (user migration, reporting platform…) pay their base hours once, in the first project.
+        foreach (var group in report.Projects.SelectMany(p => p.Findings).Where(f => f.Rule.SolutionWide).GroupBy(f => f.Rule))
+            foreach (var f in group.Skip(1)) f.ChargeBaseHours = false;
+
         foreach (var p in report.Projects)
         {
             var hours = p.Findings.Sum(f => f.EstimatedHours);

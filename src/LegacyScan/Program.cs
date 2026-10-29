@@ -102,5 +102,5 @@ internal static class Cli
         Console.WriteLine();
     }
 
-    internal static string Days(double hours, ReportOptions o) => Math.Ceiling(hours / o.HoursPerDay).ToString("N0");
+    internal static string Days(double hours, ReportOptions o) => Math.Ceiling(hours / o.HoursPerDay).ToString("N0", System.Globalization.CultureInfo.InvariantCulture);
 }

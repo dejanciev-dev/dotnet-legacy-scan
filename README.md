@@ -33,11 +33,11 @@ Options:
 | `--fail-on <minor\|major\|blocker>` | Exit code 2 when such findings exist (CI gate) |
 | `-q, --quiet` | No console summary |
 
-## What it checks (36 rules)
+## What it checks (37 rules)
 
 - **Project:** legacy csproj format, packages.config, old target framework
 - **App models:** Web Forms pages/controls/master pages, MVC 5, Web API 2, Global.asax, custom HTTP modules/handlers, WCF services and clients, ASMX, Workflow Foundation, WinForms/WPF
-- **Platform:** Membership / Forms auth / roles, ASP.NET Identity 2 / OWIN, out-of-process session, EDMX, EF6, System.Data.SqlClient, Crystal Reports / ReportViewer
+- **Platform:** Membership / roles / profile, Forms authentication, ASP.NET Identity 2 / OWIN, out-of-process session, EDMX, EF6, System.Data.SqlClient, Crystal Reports / ReportViewer
 - **Code:** `HttpContext.Current`, System.Web in libraries, BinaryFormatter, Remoting/AppDomains, Thread.Abort, COM+, CAS, WebClient, ConfigurationManager, Windows-only APIs, HttpRuntime.Cache, Server.MapPath
 - **Packages:** known packages not supported on modern .NET (charged once per family, not again when the app-model rule already covers them) or that need their ASP.NET Core variant
 
@@ -45,7 +45,7 @@ Comments and string literals are excluded from code matching.
 
 ## Estimates
 
-Each rule carries a heuristic effort (base + per occurrence), see `Rules.cs`. Totals add 3h per project and 30% regression testing; the range is ×0.75–×1.6. It is a planning starting point, not a quote. Tune the numbers with your own project history.
+Each rule carries a heuristic effort (base + per occurrence), see `Rules.cs`. Solution-wide concerns (Membership/Identity, reporting platform, Workflow, COM+) pay their base hours once per solution. Totals add 3h per project and 30% regression testing; the range is ×0.75–×1.6. It is a planning starting point, not a quote. Tune the numbers with your own project history.
 
 ## Contributing
 

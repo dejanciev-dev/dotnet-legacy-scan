@@ -246,6 +246,27 @@ try
         True(Scanner.Scan(sln).Warnings.Any(w => w.Contains("Web Site project 'WebSite1'")), "sln warning");
         True(Scanner.Scan(Path.Combine(temp, "site", "WebSite1")).Warnings.Any(w => w.Contains("looks like a Web Site")), "folder warning");
     });
+    Test("Forms auth without Membership is SEC003, not the Membership blocker", () =>
+    {
+        Fixture("forms/Web/Web.config", "<configuration><system.web><authentication mode=\"Forms\" /></system.web></configuration>");
+        var p = ProjectAnalyzer.Analyze(Fixture("forms/Web/Web.csproj", Legacy()), temp);
+        True(p.Findings.Any(f => f.Rule == Rules.FormsAuth), "forms auth");
+        True(p.Findings.All(f => f.Rule != Rules.MembershipAuth), "no membership");
+    });
+    Test("solution-wide base hours are charged once", () =>
+    {
+        const string config = "<configuration><system.web><membership /></system.web></configuration>";
+        Fixture("wide/A/Web.config", config);
+        Fixture("wide/B/Web.config", config);
+        Fixture("wide/A/A.csproj", Legacy());
+        Fixture("wide/B/B.csproj", Legacy());
+        var r = Scanner.Scan(Path.Combine(temp, "wide"));
+        var membership = r.Projects.SelectMany(p => p.Findings).Where(f => f.Rule == Rules.MembershipAuth).ToList();
+        Eq(2, membership.Count, "both projects list it");
+        Eq(Rules.MembershipAuth.BaseHours, membership.Sum(f => f.EstimatedHours), "base hours once");
+    });
+    Test("tool version keeps the prerelease part and drops build metadata", () =>
+        True(!report.ToolVersion.Contains('+') && report.ToolVersion.StartsWith("0.1.0"), report.ToolVersion));
     Test("two projects in one folder produce a warning", () =>
     {
         Fixture("shared/Lib/Lib.csproj", Legacy());

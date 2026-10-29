@@ -283,12 +283,15 @@ public static partial class ProjectAnalyzer
         IEnumerable<XElement> D(string n) => doc.Descendants().Where(e => e.Name.LocalName == n);
         IEnumerable<XElement> SystemWeb(string n) => D(n).Where(e => e.Ancestors().Any(a => a.Name.LocalName == "system.web"));
 
-        foreach (var m in SystemWeb("membership")
-                     .Concat(SystemWeb("roleManager").Where(e => string.Equals((string?)e.Attribute("enabled"), "true", StringComparison.OrdinalIgnoreCase)))
-                     .Concat(SystemWeb("profile")))
+        var providers = SystemWeb("membership")
+            .Concat(SystemWeb("roleManager").Where(e => string.Equals((string?)e.Attribute("enabled"), "true", StringComparison.OrdinalIgnoreCase)))
+            .Concat(SystemWeb("profile"))
+            .ToList();
+        foreach (var m in providers)
             CodeScanner.Add(findings, Rules.MembershipAuth, new Occurrence(rel, Line(m), $"<{m.Name.LocalName}>"));
+        // Forms auth on its own (custom login) is a much smaller job than moving Membership users to Identity.
         foreach (var a in SystemWeb("authentication").Where(e => string.Equals((string?)e.Attribute("mode"), "Forms", StringComparison.OrdinalIgnoreCase)))
-            CodeScanner.Add(findings, Rules.MembershipAuth, new Occurrence(rel, Line(a), "<authentication mode=\"Forms\">"));
+            CodeScanner.Add(findings, providers.Count > 0 ? Rules.MembershipAuth : Rules.FormsAuth, new Occurrence(rel, Line(a), "<authentication mode=\"Forms\">"));
 
         foreach (var s in D("sessionState"))
         {

@@ -144,7 +144,7 @@ public static partial class ProjectAnalyzer
         {
             var f = new Finding { Rule = Rules.Mvc5 };
             f.Occurrences.AddRange(inv.Sources
-                .Where(s => Path.GetFileNameWithoutExtension(s).EndsWith("Controller", StringComparison.OrdinalIgnoreCase) && !File.ReadAllText(s).Contains("ApiController"))
+                .Where(s => Path.GetFileNameWithoutExtension(s).EndsWith("Controller", StringComparison.OrdinalIgnoreCase) && !ReadOrEmpty(s).Contains("ApiController"))
                 .Select(s => new Occurrence(Path.GetRelativePath(dir, s), 1, "controller")));
             findings[Rules.Mvc5] = f;
             AddFiles(findings, Rules.MvcViews, inv.Views, dir);
@@ -152,7 +152,7 @@ public static partial class ProjectAnalyzer
         if (report.Kind == ProjectKind.WebApi || (report.Kind == ProjectKind.AspNetMvc && (HasRef("System.Web.Http") || HasRef("Microsoft.AspNet.WebApi"))))
         {
             var f = new Finding { Rule = Rules.WebApi2 };
-            f.Occurrences.AddRange(inv.Sources.Where(s => File.ReadAllText(s).Contains("ApiController"))
+            f.Occurrences.AddRange(inv.Sources.Where(s => ReadOrEmpty(s).Contains("ApiController"))
                 .Select(s => new Occurrence(Path.GetRelativePath(dir, s), 1, "ApiController")));
             findings[Rules.WebApi2] = f;
         }
@@ -220,7 +220,7 @@ public static partial class ProjectAnalyzer
     {
         string[] files;
         try { files = Directory.GetFiles(dir); }
-        catch (UnauthorizedAccessException) { return; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return; }
         Array.Sort(files, StringComparer.OrdinalIgnoreCase); // same report order on Windows and Linux
 
         // Another project nested below this one owns its own folder.
@@ -253,11 +253,14 @@ public static partial class ProjectAnalyzer
                 case ".json" when name.Equals("ConnectedService.json", StringComparison.OrdinalIgnoreCase): inv.ServiceRefs.Add(f); break;
             }
         }
-        var subs = Directory.GetDirectories(dir);
-        Array.Sort(subs, StringComparer.OrdinalIgnoreCase);
-        foreach (var sub in subs)
-            if (!SolutionReader.IgnoredDirs.Contains(Path.GetFileName(sub)))
-                Walk(sub, projectDir, inv, isRoot: false);
+        foreach (var sub in SolutionReader.SubDirectories(dir))
+            Walk(sub, projectDir, inv, isRoot: false);
+    }
+
+    private static string ReadOrEmpty(string path)
+    {
+        try { return File.ReadAllText(path); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return ""; }
     }
 
     private static bool IsWorkflowXaml(string path)
@@ -270,7 +273,7 @@ public static partial class ProjectAnalyzer
             var s = new string(head, 0, n);
             return s.Contains("<Activity", StringComparison.Ordinal) || s.Contains("schemas.microsoft.com/netfx/2009/xaml/activities", StringComparison.Ordinal);
         }
-        catch (IOException) { return false; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return false; }
     }
 
     private static void AnalyzeConfig(string path, string rel, Dictionary<Rule, Finding> findings, Inventory inv)

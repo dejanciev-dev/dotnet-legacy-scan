@@ -54,7 +54,7 @@ public static class CodeScanner
     {
         string text;
         try { text = File.ReadAllText(path); }
-        catch (IOException) { return; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return; }
 
         var isVb = path.EndsWith(".vb", StringComparison.OrdinalIgnoreCase);
         var original = text.Split('\n');

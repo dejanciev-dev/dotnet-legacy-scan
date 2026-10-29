@@ -267,6 +267,30 @@ try
     });
     Test("tool version keeps the prerelease part and drops build metadata", () =>
         True(!report.ToolVersion.Contains('+') && report.ToolVersion.StartsWith("0.1.0"), report.ToolVersion));
+    Test("a symlink/junction loop does not drop the project", () =>
+    {
+        var path = Fixture("loop/P/P.csproj", Legacy());
+        Fixture("loop/P/src/A.cs", "class A { object x = HttpContext.Current; }");
+        var link = Path.Combine(temp, "loop", "P", "src", "loop");
+        try { Directory.CreateSymbolicLink(link, Path.Combine(temp, "loop", "P", "src")); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Windows without developer mode cannot create symlinks; a junction behaves the same for the scanner.
+            if (OperatingSystem.IsWindows())
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("cmd", $"/c mklink /J \"{link}\" \"{Path.GetDirectoryName(link)}\"") { CreateNoWindow = true, UseShellExecute = false })!.WaitForExit();
+        }
+        True(Directory.Exists(link), "loop link created");
+        var p = ProjectAnalyzer.Analyze(path, temp);
+        Eq(1, p.Findings.Single(f => f.Rule == Rules.HttpContextCurrent).Occurrences.Count, "file scanned once");
+        Directory.Delete(link); // remove the link only, before the recursive cleanup
+    });
+    Test("nothing to analyze is an error, not an empty 'None' report", () =>
+    {
+        Directory.CreateDirectory(Path.Combine(temp, "empty"));
+        var html = Path.Combine(temp, "empty.html");
+        Eq(1, Cli.Run([Path.Combine(temp, "empty"), "-q", "-o", html]), "exit code");
+        True(!File.Exists(html), "no report written");
+    });
     Test("two projects in one folder produce a warning", () =>
     {
         Fixture("shared/Lib/Lib.csproj", Legacy());

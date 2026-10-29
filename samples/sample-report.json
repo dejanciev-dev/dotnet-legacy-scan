@@ -2,7 +2,7 @@
   "schema": "dotnet-legacy-scan/v1",
   "toolVersion": "0.1.0",
   "input": "samples/LegacyShop/LegacyShop.sln",
-  "scannedAt": "2026-10-29T14:08:20.1332188+01:00",
+  "scannedAt": "2026-10-29T14:20:49.2795852+01:00",
   "summary": {
     "projects": 7,
     "modernProjects": 1,
@@ -116,7 +116,7 @@
           "category": "Project",
           "count": 1,
           "estimatedHours": 2,
-          "guidance": "Convert to SDK-style csproj (try-convert or by hand). Do this first; it makes every later step easier and can be done while still targeting net48.",
+          "guidance": "Convert to SDK-style csproj (by hand or with Microsoft\u0027s upgrade tooling). Do this first; it makes every later step easier and can be done while still targeting net48.",
           "occurrences": [
             {
               "file": "LegacyShop.Core/LegacyShop.Core.csproj",
@@ -180,7 +180,7 @@
           "category": "Project",
           "count": 1,
           "estimatedHours": 1,
-          "guidance": "Migrate to PackageReference (Visual Studio: right-click packages.config \u2192 Migrate). Review transitive dependencies afterwards.",
+          "guidance": "Migrate to PackageReference (Visual Studio: right-click packages.config \u2192 Migrate; not offered for ASP.NET web projects, convert those by hand or as part of the SDK-style conversion). Review transitive dependencies afterwards.",
           "occurrences": [
             {
               "file": "packages.config",
@@ -358,7 +358,7 @@
         },
         {
           "id": "WEB001",
-          "title": "Out-of-process or heavy Session state",
+          "title": "ASP.NET Session state (usage or out-of-process mode)",
           "severity": "major",
           "category": "Web",
           "count": 4,
@@ -442,7 +442,7 @@
           "category": "Project",
           "count": 1,
           "estimatedHours": 2,
-          "guidance": "Convert to SDK-style csproj (try-convert or by hand). Do this first; it makes every later step easier and can be done while still targeting net48.",
+          "guidance": "Convert to SDK-style csproj (by hand or with Microsoft\u0027s upgrade tooling). Do this first; it makes every later step easier and can be done while still targeting net48.",
           "occurrences": [
             {
               "file": "LegacyShop.Web/LegacyShop.Web.csproj",
@@ -458,7 +458,7 @@
           "category": "Project",
           "count": 1,
           "estimatedHours": 1,
-          "guidance": "Migrate to PackageReference (Visual Studio: right-click packages.config \u2192 Migrate). Review transitive dependencies afterwards.",
+          "guidance": "Migrate to PackageReference (Visual Studio: right-click packages.config \u2192 Migrate; not offered for ASP.NET web projects, convert those by hand or as part of the SDK-style conversion). Review transitive dependencies afterwards.",
           "occurrences": [
             {
               "file": "packages.config",
@@ -556,7 +556,7 @@
           "category": "Project",
           "count": 1,
           "estimatedHours": 2,
-          "guidance": "Convert to SDK-style csproj (try-convert or by hand). Do this first; it makes every later step easier and can be done while still targeting net48.",
+          "guidance": "Convert to SDK-style csproj (by hand or with Microsoft\u0027s upgrade tooling). Do this first; it makes every later step easier and can be done while still targeting net48.",
           "occurrences": [
             {
               "file": "LegacyShop.Services/LegacyShop.Services.csproj",
@@ -679,7 +679,7 @@
           "category": "Project",
           "count": 1,
           "estimatedHours": 2,
-          "guidance": "Convert to SDK-style csproj (try-convert or by hand). Do this first; it makes every later step easier and can be done while still targeting net48.",
+          "guidance": "Convert to SDK-style csproj (by hand or with Microsoft\u0027s upgrade tooling). Do this first; it makes every later step easier and can be done while still targeting net48.",
           "occurrences": [
             {
               "file": "LegacyShop.Admin/LegacyShop.Admin.csproj",
@@ -711,7 +711,7 @@
           "category": "Project",
           "count": 1,
           "estimatedHours": 1,
-          "guidance": "Migrate to PackageReference (Visual Studio: right-click packages.config \u2192 Migrate). Review transitive dependencies afterwards.",
+          "guidance": "Migrate to PackageReference (Visual Studio: right-click packages.config \u2192 Migrate; not offered for ASP.NET web projects, convert those by hand or as part of the SDK-style conversion). Review transitive dependencies afterwards.",
           "occurrences": [
             {
               "file": "packages.config",
@@ -813,7 +813,7 @@
           "category": "Project",
           "count": 1,
           "estimatedHours": 2,
-          "guidance": "Convert to SDK-style csproj (try-convert or by hand). Do this first; it makes every later step easier and can be done while still targeting net48.",
+          "guidance": "Convert to SDK-style csproj (by hand or with Microsoft\u0027s upgrade tooling). Do this first; it makes every later step easier and can be done while still targeting net48.",
           "occurrences": [
             {
               "file": "LegacyShop.Reports/LegacyShop.Reports.vbproj",
@@ -880,7 +880,7 @@
           "category": "Project",
           "count": 1,
           "estimatedHours": 2,
-          "guidance": "Convert to SDK-style csproj (try-convert or by hand). Do this first; it makes every later step easier and can be done while still targeting net48.",
+          "guidance": "Convert to SDK-style csproj (by hand or with Microsoft\u0027s upgrade tooling). Do this first; it makes every later step easier and can be done while still targeting net48.",
           "occurrences": [
             {
               "file": "LegacyShop.Tests/LegacyShop.Tests.csproj",

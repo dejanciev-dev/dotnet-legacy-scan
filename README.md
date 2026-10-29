@@ -55,7 +55,7 @@ Issues and pull requests are welcome, especially new rules and false-positive re
 
 ```bash
 dotnet build
-dotnet run --project tests/LegacyScan.Tests     # 27 tests against samples/LegacyShop
+dotnet run --project tests/LegacyScan.Tests     # 40 tests against samples/LegacyShop
 dotnet pack src/LegacyScan -c Release           # → nupkg/dotnet-legacy-scan.0.1.0.nupkg
 ```
 

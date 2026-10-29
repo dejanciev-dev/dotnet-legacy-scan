@@ -82,12 +82,32 @@ public static partial class SolutionReader
         while (stack.Count > 0)
         {
             var d = stack.Pop();
-            result.AddRange(Directory.GetFiles(d).Where(f => ProjectExtensions.Contains(Path.GetExtension(f).ToLowerInvariant())));
-            foreach (var sub in Directory.GetDirectories(d))
-                if (!IgnoredDirs.Contains(Path.GetFileName(sub))) stack.Push(sub);
+            try { result.AddRange(Directory.GetFiles(d).Where(f => ProjectExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()))); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { continue; }
+            foreach (var sub in SubDirectories(d)) stack.Push(sub);
         }
         result.Sort(StringComparer.OrdinalIgnoreCase);
         return result;
+    }
+
+    /// <summary>
+    /// Subdirectories to scan, sorted: build/tool folders, junctions and symlinks (which can loop) and unreadable folders are skipped.
+    /// </summary>
+    internal static string[] SubDirectories(string dir)
+    {
+        try
+        {
+            var subs = new DirectoryInfo(dir).GetDirectories()
+                .Where(d => !IgnoredDirs.Contains(d.Name) && !d.Attributes.HasFlag(FileAttributes.ReparsePoint))
+                .Select(d => d.FullName)
+                .ToArray();
+            Array.Sort(subs, StringComparer.OrdinalIgnoreCase);
+            return subs;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return [];
+        }
     }
 
     private static bool LooksLikeWebSite(string dir)

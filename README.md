@@ -12,7 +12,7 @@ Point it at a solution and get a report a CTO can read: what blocks the migratio
 - **C# and VB.NET:** `.sln`, `.slnx`, a single `.csproj`/`.vbproj`, or a folder
 - **Three outputs:** a self-contained HTML report (prints to PDF), JSON for tooling, a Markdown summary for pull requests and CI
 
-![Migration readiness report for the sample solution](docs/report-screenshot.png)
+![Migration readiness report for the sample solution](https://raw.githubusercontent.com/dejanciev-dev/dotnet-legacy-scan/main/docs/report-screenshot.png)
 
 <sub>The report for [`samples/LegacyShop`](samples/LegacyShop): full [HTML](samples/sample-report.html) (download and open it), [JSON](samples/sample-report.json), [Markdown](samples/sample-report.md).</sub>
 
@@ -332,6 +332,7 @@ src/LegacyScan/
   JsonReport.cs       JSON report (schema dotnet-legacy-scan/v1)
   MarkdownReport.cs   Markdown summary
   Model.cs            Rule, Finding, Occurrence, ProjectReport, ScanReport, ReportOptions
+  PACKAGE.md          Short README shown on nuget.org (no diagrams, absolute links)
 tests/LegacyScan.Tests/   Dependency-free test runner (47 tests)
 samples/LegacyShop/       Fake legacy solution used by the tests and the sample reports
 ```

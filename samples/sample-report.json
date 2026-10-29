@@ -2,7 +2,7 @@
   "schema": "dotnet-legacy-scan/v1",
   "toolVersion": "0.1.0",
   "input": "samples/LegacyShop/LegacyShop.sln",
-  "scannedAt": "2026-10-29T15:13:22.107683+01:00",
+  "scannedAt": "2026-10-29T16:02:46.9782604+01:00",
   "summary": {
     "projects": 7,
     "modernProjects": 1,
@@ -274,17 +274,17 @@
             {
               "file": "Cart.aspx",
               "line": 1,
-              "snippet": "Cart.aspx"
+              "snippet": "Cart.aspx \u00B7 6 server controls \u00B7 1 UpdatePanel \u00B7 13 lines code-behind"
             },
             {
               "file": "Checkout.aspx",
               "line": 1,
-              "snippet": "Checkout.aspx"
+              "snippet": "Checkout.aspx \u00B7 13 lines code-behind"
             },
             {
               "file": "Default.aspx",
               "line": 1,
-              "snippet": "Default.aspx"
+              "snippet": "Default.aspx \u00B7 13 lines code-behind"
             }
           ]
         },

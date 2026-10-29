@@ -131,8 +131,8 @@ public static partial class ProjectAnalyzer
             if (version < 472) CodeScanner.Add(findings, Rules.OldFramework, new Occurrence(report.Path, 1, report.TargetFramework));
         }
 
-        AddFiles(findings, Rules.WebForms, inv.Aspx, dir);
-        AddFiles(findings, Rules.WebFormsControls, inv.Ascx.Concat(inv.Master), dir);
+        AddPages(findings, Rules.WebForms, inv.Aspx, dir);
+        AddPages(findings, Rules.WebFormsControls, inv.Ascx.Concat(inv.Master), dir);
         AddFiles(findings, Rules.Asmx, inv.Asmx, dir);
         AddFiles(findings, Rules.Edmx, inv.Edmx, dir);
         AddFiles(findings, Rules.WcfClient, inv.ServiceRefs, dir);
@@ -215,6 +215,34 @@ public static partial class ProjectAnalyzer
         CodeScanner.Add(findings, rule);
         findings[rule].Occurrences.AddRange(list.Select(f => new Occurrence(Path.GetRelativePath(dir, f), 1, Path.GetFileName(f))));
     }
+
+    private static void AddPages(Dictionary<Rule, Finding> findings, Rule rule, IEnumerable<string> pages, string dir)
+    {
+        foreach (var page in pages)
+            CodeScanner.Add(findings, rule, new Occurrence(Path.GetRelativePath(dir, page), 1, DescribePage(page)));
+    }
+
+    /// <summary>
+    /// "Cart.aspx · 12 server controls · 1 UpdatePanel · 85 lines code-behind": size hints to plan the rewrite page by page.
+    /// Informational only; the estimate stays per page until the heuristics can be calibrated.
+    /// </summary>
+    private static string DescribePage(string page)
+    {
+        static string Plural(int n, string word) => $"{n} {word}{(n == 1 ? "" : "s")}";
+        var markup = ReadOrEmpty(page);
+        var parts = new List<string> { Path.GetFileName(page) };
+        if (ServerControl().Count(markup) is var controls and > 0) parts.Add(Plural(controls, "server control"));
+        if (UpdatePanel().Count(markup) is var panels and > 0) parts.Add(Plural(panels, "UpdatePanel"));
+        if (new[] { ".cs", ".vb" }.Select(ext => page + ext).FirstOrDefault(File.Exists) is { } codeBehind)
+            parts.Add($"{ReadOrEmpty(codeBehind).Split('\n').Count(l => !string.IsNullOrWhiteSpace(l))} lines code-behind");
+        return string.Join(" · ", parts);
+    }
+
+    [GeneratedRegex("""runat\s*=\s*["']?server""", RegexOptions.IgnoreCase)]
+    private static partial Regex ServerControl();
+
+    [GeneratedRegex(@"<asp:UpdatePanel\b", RegexOptions.IgnoreCase)]
+    private static partial Regex UpdatePanel();
 
     private static void Walk(string dir, string projectDir, Inventory inv, bool isRoot)
     {

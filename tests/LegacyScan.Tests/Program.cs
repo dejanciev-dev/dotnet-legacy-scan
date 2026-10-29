@@ -166,6 +166,35 @@ Test("HTML is self-contained, encoded and branded", () =>
     True(html.Contains("&lt;Acme&gt;"), "encoded brand");
     True(html.Contains("mailto:me@example.com"), "mailto");
 });
+Test("Markdown summary has the headline table, blockers and order", () =>
+{
+    var md = MarkdownReport.Render(report, new ReportOptions());
+    True(md.StartsWith("## Migration readiness: LegacyShop.sln"), "title");
+    True(md.Contains("| **High**") || md.Contains("| **Medium**") || md.Contains("| **Very high**"), "difficulty cell");
+    True(md.Contains("**ASP.NET Web Forms pages** ×3 in LegacyShop.Web"), "blocker line");
+    True(md.Contains("| 1 | LegacyShop.Core |"), "order starts with the dependency");
+});
+Test("--no-snippets hides scanned code lines but keeps tool text", () =>
+{
+    var options = new ReportOptions { IncludeSnippets = false };
+    var html = HtmlReport.Render(report, options);
+    var json = JsonReport.Render(report, options);
+    True(!html.Contains("CurrentUser") && !json.Contains("CurrentUser"), "code line from CartService.cs left out");
+    True(html.Contains("Microsoft.Owin.Security.Cookies") && json.Contains("\\u003Cmembership\\u003E"), "package and config text kept");
+    True(HtmlReport.Render(report, new ReportOptions()).Contains("CurrentUser"), "shown by default");
+});
+Test("Web Forms pages list server controls, UpdatePanels and code-behind size", () =>
+{
+    var cart = F("LegacyShop.Web", Rules.WebForms)!.Occurrences.Single(o => o.File == "Cart.aspx").Snippet;
+    True(cart.StartsWith("Cart.aspx · 6 server controls · 1 UpdatePanel · ") && cart.EndsWith("lines code-behind"), cart);
+});
+Test("--exclude skips projects by name or path and says so", () =>
+{
+    var r = Scanner.Scan(sample, ["*.Tests", "LegacyShop.Reports/*"]);
+    Eq(5, r.Projects.Count, "projects");
+    True(r.Warnings.Any(w => w.StartsWith("Excluded by --exclude (2)")), string.Join("; ", r.Warnings));
+});
+Test("--version prints the version", () => Eq(0, Cli.Run(["--version"])));
 Test("collapsed findings are expanded when printing", () =>
     True(HtmlReport.Render(report, new ReportOptions()).Contains("details::details-content{content-visibility:visible"), "print css"));
 Test("JSON parses", () =>

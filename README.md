@@ -18,6 +18,9 @@ Point it at a solution and get a report a CTO can read: what blocks the migratio
 dotnet tool install -g dotnet-legacy-scan
 dotnet legacy-scan path/to/MySolution.sln
 
+# one-off run without installing (.NET 10 SDK)
+dnx dotnet-legacy-scan path/to/MySolution.sln
+
 # from source
 dotnet run --project src/LegacyScan -- path/to/MySolution.sln -o report.html --json report.json
 ```
@@ -28,10 +31,27 @@ Options:
 |---|---|
 | `-o, --out <file>` | HTML report path (default `legacy-scan-report.html`) |
 | `--json <file>` | Also write JSON |
+| `--md <file>` | Also write a short Markdown summary (for pull requests or the CI job summary) |
+| `--exclude <pattern>` | Skip projects whose name or relative path matches (`*`, `?`); repeatable. The report lists what was excluded |
+| `--no-snippets` | Leave source code lines out of the HTML/JSON, so the report can be shared outside the team |
 | `--brand <text>` / `--contact <text>` | Footer call-to-action (your company + email/URL) |
 | `--hours-per-day <n>` | Productive hours per day for the day estimate (default 6) |
 | `--fail-on <minor\|major\|blocker>` | Exit code 2 when such findings exist (CI gate) |
 | `-q, --quiet` | No console summary |
+| `--version` | Print the version |
+
+### In CI (GitHub Actions)
+
+```yaml
+- run: dotnet tool install -g dotnet-legacy-scan
+- run: dotnet legacy-scan MySolution.sln -o legacy-scan.html --md "$GITHUB_STEP_SUMMARY" --exclude "*.Tests"
+- uses: actions/upload-artifact@v6
+  with:
+    name: legacy-scan
+    path: legacy-scan.html
+```
+
+Add `--fail-on blocker` to stop new blockers (for example a new Web Forms page) from coming back once they are gone.
 
 ## What it checks (37 rules)
 
@@ -55,21 +75,20 @@ Issues and pull requests are welcome, especially new rules and false-positive re
 
 ```bash
 dotnet build
-dotnet run --project tests/LegacyScan.Tests     # 42 tests against samples/LegacyShop
+dotnet run --project tests/LegacyScan.Tests     # 47 tests against samples/LegacyShop
 dotnet pack src/LegacyScan -c Release           # → nupkg/dotnet-legacy-scan.0.1.0.nupkg
 ```
 
 `samples/LegacyShop` is a fake legacy solution (Web Forms, WCF + ASMX, MVC 5 + Web API, EF6/EDMX library, VB.NET Crystal Reports, tests, one modern project) used by the tests.
 
-Targets `net10.0` with `RollForward=Major`. To support machines with only .NET 8, change to `<TargetFrameworks>net8.0;net10.0</TargetFrameworks>`.
+Targets `net10.0` (the current LTS) with `RollForward=Major`, so it also runs on newer runtimes. .NET 8 and 9 reach end of support on 10 November 2026, so they are not targeted.
 
 ## Roadmap
 
 - Roslyn semantic analysis (exact API usage, fewer false positives)
 - NuGet API lookup: does a newer version support net8+/netstandard2.0?
-- Per-page Web Forms complexity (controls, ViewState, UpdatePanels, code-behind size)
+- Use per-page Web Forms complexity (controls, UpdatePanels and code-behind size are already shown per page) in the estimate, once calibrated
 - Calibrate effort from real migrations
-- `--format md` for pull-request comments
 
 ## Releasing
 

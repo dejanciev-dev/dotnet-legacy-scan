@@ -1,14 +1,30 @@
+using System.Text.RegularExpressions;
+
 namespace LegacyScan;
 
 public static class Scanner
 {
-    public static ScanReport Scan(string input)
+    /// <param name="exclude">Wildcard patterns (* and ?) matched against the project name or its path relative to the input.</param>
+    public static ScanReport Scan(string input, IReadOnlyCollection<string>? exclude = null)
     {
         var report = new ScanReport { Input = Path.GetFullPath(input) };
         var projects = SolutionReader.FindProjects(input, report.Warnings);
         if (projects.Count == 0) report.Warnings.Add("No .csproj or .vbproj projects found.");
 
         var rootDir = Directory.Exists(report.Input) ? report.Input : Path.GetDirectoryName(report.Input)!;
+        if (exclude is { Count: > 0 })
+        {
+            var patterns = exclude.Select(Wildcard).ToList();
+            var excluded = projects.Where(p => patterns.Any(r =>
+                r.IsMatch(Path.GetFileNameWithoutExtension(p)) || r.IsMatch(Path.GetRelativePath(rootDir, p).Replace('\\', '/')))).ToList();
+            // Said in the report, so nobody reads a partial scan as the whole solution.
+            if (excluded.Count > 0)
+            {
+                projects = projects.Except(excluded).ToList();
+                report.Warnings.Add($"Excluded by --exclude ({excluded.Count}): {string.Join(", ", excluded.Select(Path.GetFileNameWithoutExtension))}");
+            }
+        }
+
         foreach (var shared in projects.GroupBy(p => Path.GetDirectoryName(p)!, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1))
             report.Warnings.Add($"{string.Join(" and ", shared.Select(Path.GetFileName))} share the folder {Path.GetRelativePath(rootDir, shared.Key)}; its files are counted for each of them.");
 
@@ -28,6 +44,10 @@ public static class Scanner
         Estimator.Estimate(report);
         return report;
     }
+
+    private static Regex Wildcard(string pattern) =>
+        new("^" + Regex.Escape(pattern.Replace('\\', '/')).Replace(@"\*", ".*").Replace(@"\?", ".") + "$",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     /// <summary>
     /// Projects with the same file name (e.g. two "Core.csproj" in a directory scan) get their path appended,

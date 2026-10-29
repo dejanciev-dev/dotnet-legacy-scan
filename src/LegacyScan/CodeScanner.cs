@@ -68,7 +68,7 @@ public static class CodeScanner
             for (var i = 0; i < lines.Length; i++)
             {
                 if (!pattern.Regex.IsMatch(lines[i])) continue;
-                Add(findings, pattern.Rule, new Occurrence(relPath, i + 1, original[i].Trim().TrimEnd('\r')));
+                Add(findings, pattern.Rule, new Occurrence(relPath, i + 1, original[i].Trim().TrimEnd('\r'), FromSource: true));
                 // SystemWebInLibrary: count once per file
                 if (pattern.Rule == Rules.SystemWebInLibrary) break;
             }

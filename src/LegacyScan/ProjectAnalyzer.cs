@@ -28,7 +28,7 @@ public static partial class ProjectAnalyzer
         public readonly List<string> Sources = [];
     }
 
-    public static ProjectReport Analyze(string projectPath, string rootDir)
+    public static ProjectReport Analyze(string projectPath, string rootDir, List<string>? warnings = null)
     {
         var dir = Path.GetDirectoryName(projectPath)!;
         var report = new ProjectReport
@@ -46,12 +46,17 @@ public static partial class ProjectAnalyzer
 
         // ---- Project format & target ----
         report.IsSdkStyle = root.Attribute("Sdk") is not null || Els("Sdk").Length > 0 || Els("Import").Any(e => e.Attribute("Sdk") is not null);
-        var tfms = (Val("TargetFrameworks") ?? Val("TargetFramework"))?.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var tfmValue = Val("TargetFrameworks") ?? Val("TargetFramework");
+        if (tfmValue is null && report.IsSdkStyle) tfmValue = TfmFromDirectoryBuildProps(dir);
+        var tfms = tfmValue?.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         if (tfms is { Length: > 0 }) report.TargetFramework = string.Join(";", tfms);
         else if (Val("TargetFrameworkVersion") is { } v) report.TargetFramework = "net" + v.TrimStart('v', 'V').Replace(".", "");
 
+        // Multi-targeting net48;net10.0 means the project already builds for modern .NET.
         var allTfms = report.TargetFramework.Split(';');
-        report.IsModernAlready = report.IsSdkStyle && allTfms.All(t => ModernTfm().IsMatch(t));
+        report.IsModernAlready = report.IsSdkStyle && allTfms.Any(t => ModernTfm().IsMatch(t));
+        if (report.IsSdkStyle && !allTfms.Any(t => ModernTfm().IsMatch(t) || FrameworkTfm().IsMatch(t)))
+            warnings?.Add($"Target framework of {report.Path} could not be resolved ('{report.TargetFramework}'); treated as not yet migrated.");
 
         // ---- References & packages ----
         var references = Els("Reference").Select(e => ((string?)e.Attribute("Include") ?? "").Split(',')[0].Trim()).Where(s => s.Length > 0).ToList();
@@ -72,7 +77,11 @@ public static partial class ProjectAnalyzer
 
         foreach (var pr in Els("ProjectReference"))
             if ((string?)pr.Attribute("Include") is { } inc)
-                report.ProjectReferences.Add(Path.GetFileNameWithoutExtension(inc.Replace('\\', '/')));
+            {
+                var refPath = inc.Replace('\\', Path.DirectorySeparatorChar);
+                report.ProjectReferences.Add(Path.GetFileNameWithoutExtension(refPath));
+                report.ProjectReferencePaths.Add(Path.GetFullPath(Path.Combine(dir, refPath)));
+            }
 
         bool HasRef(string name) =>
             references.Any(r => r.Equals(name, StringComparison.OrdinalIgnoreCase) || r.StartsWith(name + ".", StringComparison.OrdinalIgnoreCase))
@@ -86,15 +95,16 @@ public static partial class ProjectAnalyzer
         Walk(dir, dir, inv, isRoot: true);
 
         // ---- Kind ----
+        // Test projects often reference System.Web.Mvc / Web API to test controllers, so check them before the web kinds.
         report.Kind =
             inv.Aspx.Count > 0 ? ProjectKind.WebForms :
+            typeGuids.Contains(TypeGuids.Test) || HasRef("Microsoft.VisualStudio.QualityTools.UnitTestFramework") || HasRef("NUnit") || HasRef("xunit") || HasRef("MSTest.TestFramework") ? ProjectKind.Test :
             HasRef("System.Web.Mvc") || HasRef("Microsoft.AspNet.Mvc") ? ProjectKind.AspNetMvc :
             HasRef("System.Web.Http") || HasRef("Microsoft.AspNet.WebApi") ? ProjectKind.WebApi :
             inv.Svc.Count > 0 || typeGuids.Contains(TypeGuids.Wcf) ? ProjectKind.WcfService :
             typeGuids.Contains(TypeGuids.WebApp) ? ProjectKind.WebForms :
             typeGuids.Contains(TypeGuids.Wpf) || HasRef("PresentationFramework") || Val("UseWPF") == "true" ? ProjectKind.Wpf :
             HasRef("System.Windows.Forms") && outputType == "winexe" || Val("UseWindowsForms") == "true" ? ProjectKind.WinForms :
-            typeGuids.Contains(TypeGuids.Test) || HasRef("Microsoft.VisualStudio.QualityTools.UnitTestFramework") || HasRef("NUnit") || HasRef("xunit") || HasRef("MSTest.TestFramework") ? ProjectKind.Test :
             outputType is "exe" or "winexe" ? ProjectKind.Console :
             ProjectKind.ClassLibrary;
 
@@ -163,6 +173,11 @@ public static partial class ProjectAnalyzer
         if (report.Kind == ProjectKind.WcfService) findings.Remove(Rules.WcfClient);
 
         // ---- Packages ----
+        if (HasRef("Microsoft.AspNet.Identity") || HasRef("Microsoft.Owin.Security"))
+            CodeScanner.Add(findings, Rules.AspNetIdentity2, new Occurrence("packages", 0, "Microsoft.AspNet.Identity / Microsoft.Owin.Security"));
+
+        // One occurrence per package family; skip families whose cost is already in an app-model rule (e.g. MVC packages → APP003).
+        var families = new Dictionary<string, (Rules.KnownPackage Known, List<string> Packages)>(StringComparer.OrdinalIgnoreCase);
         foreach (var pkg in report.Packages.Concat(references.Where(r => !report.Packages.Any(p => p.StartsWith(r + " ", StringComparison.OrdinalIgnoreCase)))))
         {
             var id = pkg.Split(' ')[0];
@@ -171,15 +186,14 @@ public static partial class ProjectAnalyzer
                 CodeScanner.Add(findings, Rules.Ef6Package, new Occurrence("packages", 0, pkg));
                 continue;
             }
-            foreach (var (prefix, rule, note) in Rules.KnownPackages)
-            {
-                if (!id.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) continue;
-                CodeScanner.Add(findings, rule, new Occurrence("packages", 0, $"{pkg} {note}"));
-                break;
-            }
+            if (Rules.SupportedOnModern.Contains(id)) continue;
+            var known = Rules.KnownPackages.FirstOrDefault(k => id.StartsWith(k.Prefix, StringComparison.OrdinalIgnoreCase));
+            if (known is null || (known.CoveredBy is { } covered && findings.ContainsKey(covered))) continue;
+            if (!families.TryGetValue(known.FamilyKey, out var family)) families[known.FamilyKey] = family = (known, []);
+            family.Packages.Add(pkg);
         }
-        if (HasRef("Microsoft.AspNet.Identity") || HasRef("Microsoft.Owin.Security"))
-            CodeScanner.Add(findings, Rules.AspNetIdentity2, new Occurrence("packages", 0, "Microsoft.AspNet.Identity / Microsoft.Owin.Security"));
+        foreach (var (known, packages) in families.Values)
+            CodeScanner.Add(findings, known.Rule, new Occurrence("packages", 0, $"{string.Join(", ", packages)} {known.Note}"));
 
         Finish(report, findings);
         report.RecommendedTarget = Recommend(report);
@@ -316,7 +330,27 @@ public static partial class ProjectAnalyzer
             ProjectKind.Test => "net10.0, same test framework with updated packages. Migrate together with the project under test.",
             ProjectKind.Console => "net10.0.",
             _ when usesSystemWeb => "Remove System.Web dependencies, then multi-target net48;net10.0 (or netstandard2.0).",
+            _ when p.WorstSeverity >= Severity.Major => "Multi-target net48;net10.0 (or netstandard2.0) once its major and blocker findings are resolved.",
             _ => "Multi-target net48;net10.0 (or netstandard2.0). Good first candidate.",
         };
+    }
+
+    /// <summary>Nearest Directory.Build.props (walking up) that sets TargetFramework(s), as SDK projects often inherit it.</summary>
+    private static string? TfmFromDirectoryBuildProps(string projectDir)
+    {
+        for (var d = new DirectoryInfo(projectDir); d is not null; d = d.Parent)
+        {
+            var props = Path.Combine(d.FullName, "Directory.Build.props");
+            if (!File.Exists(props)) continue;
+            try
+            {
+                var els = XDocument.Load(props).Descendants().ToList();
+                var value = els.Where(e => e.Name.LocalName == "TargetFrameworks").Concat(els.Where(e => e.Name.LocalName == "TargetFramework"))
+                    .Select(e => e.Value.Trim()).FirstOrDefault(v => v.Length > 0);
+                if (value is not null) return value;
+            }
+            catch (System.Xml.XmlException) { return null; }
+        }
+        return null;
     }
 }

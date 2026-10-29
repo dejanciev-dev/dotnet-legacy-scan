@@ -13,7 +13,7 @@ public static class Scanner
         {
             try
             {
-                report.Projects.Add(ProjectAnalyzer.Analyze(path, rootDir));
+                report.Projects.Add(ProjectAnalyzer.Analyze(path, rootDir, report.Warnings));
             }
             catch (Exception ex) when (ex is IOException or System.Xml.XmlException or UnauthorizedAccessException)
             {
@@ -21,7 +21,25 @@ public static class Scanner
             }
         }
 
+        MakeNamesUnique(report.Projects, rootDir);
         Estimator.Estimate(report);
         return report;
+    }
+
+    /// <summary>
+    /// Projects with the same file name (e.g. two "Core.csproj" in a directory scan) get their path appended,
+    /// and project references are re-pointed by full path so the migration order stays correct.
+    /// </summary>
+    private static void MakeNamesUnique(List<ProjectReport> projects, string rootDir)
+    {
+        foreach (var group in projects.GroupBy(p => p.Name, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1))
+            foreach (var p in group) p.Name = $"{p.Name} ({p.Path})";
+
+        var byPath = projects
+            .GroupBy(p => Path.GetFullPath(Path.Combine(rootDir, p.Path)), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+        foreach (var p in projects)
+            for (var i = 0; i < p.ProjectReferencePaths.Count; i++)
+                if (byPath.TryGetValue(p.ProjectReferencePaths[i], out var target)) p.ProjectReferences[i] = target.Name;
     }
 }

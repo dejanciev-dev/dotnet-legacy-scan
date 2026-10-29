@@ -39,7 +39,7 @@ Options:
 - **App models:** Web Forms pages/controls/master pages, MVC 5, Web API 2, Global.asax, custom HTTP modules/handlers, WCF services and clients, ASMX, Workflow Foundation, WinForms/WPF
 - **Platform:** Membership / Forms auth / roles, ASP.NET Identity 2 / OWIN, out-of-process session, EDMX, EF6, System.Data.SqlClient, Crystal Reports / ReportViewer
 - **Code:** `HttpContext.Current`, System.Web in libraries, BinaryFormatter, Remoting/AppDomains, Thread.Abort, COM+, CAS, WebClient, ConfigurationManager, Windows-only APIs, HttpRuntime.Cache, Server.MapPath
-- **Packages:** known packages with no modern equivalent or that need their ASP.NET Core variant
+- **Packages:** known packages not supported on modern .NET (charged once per family, not again when the app-model rule already covers them) or that need their ASP.NET Core variant
 
 Comments and string literals are excluded from code matching.
 
@@ -55,7 +55,7 @@ Issues and pull requests are welcome, especially new rules and false-positive re
 
 ```bash
 dotnet build
-dotnet run --project tests/LegacyScan.Tests     # 18 tests against samples/LegacyShop
+dotnet run --project tests/LegacyScan.Tests     # 27 tests against samples/LegacyShop
 dotnet pack src/LegacyScan -c Release           # → nupkg/dotnet-legacy-scan.0.1.0.nupkg
 ```
 

@@ -40,7 +40,10 @@ public static partial class SolutionReader
         IEnumerable<string> relPaths;
         if (slnPath.EndsWith(".slnx", StringComparison.OrdinalIgnoreCase))
         {
-            relPaths = XDocument.Load(slnPath).Descendants()
+            XDocument doc;
+            try { doc = XDocument.Load(slnPath); }
+            catch (System.Xml.XmlException ex) { throw new FormatException($"Could not read {Path.GetFileName(slnPath)}: {ex.Message}", ex); }
+            relPaths = doc.Descendants()
                 .Where(e => e.Name.LocalName == "Project")
                 .Select(e => (string?)e.Attribute("Path"))
                 .OfType<string>();

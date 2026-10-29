@@ -79,6 +79,12 @@ internal static class Cli
             Console.Error.WriteLine("Run 'dotnet legacy-scan --help' for usage.");
             return 1;
         }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"error: unexpected {ex.GetType().Name}: {ex.Message}");
+            Console.Error.WriteLine("Please report this at https://github.com/dejanciev-dev/dotnet-legacy-scan/issues");
+            return 1;
+        }
     }
 
     private static void PrintSummary(ScanReport r, ReportOptions o, string html, string? json)

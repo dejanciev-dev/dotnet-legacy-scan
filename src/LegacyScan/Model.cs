@@ -46,7 +46,8 @@ public sealed class Finding
 
 public sealed class ProjectReport
 {
-    public required string Name { get; init; }
+    /// <summary>Project file name; made unique by <see cref="Scanner"/> when two projects share it.</summary>
+    public required string Name { get; set; }
     public required string Path { get; init; }
     public string Language { get; set; } = "C#";
     public ProjectKind Kind { get; set; } = ProjectKind.Unknown;
@@ -55,6 +56,8 @@ public sealed class ProjectReport
     public int SourceFiles { get; set; }
     public int LinesOfCode { get; set; }
     public List<string> ProjectReferences { get; } = [];
+    /// <summary>Full paths of <see cref="ProjectReferences"/> (same order), used to resolve references to renamed projects.</summary>
+    internal List<string> ProjectReferencePaths { get; } = [];
     public List<string> Packages { get; } = [];
     public List<Finding> Findings { get; } = [];
     public string RecommendedTarget { get; set; } = "";

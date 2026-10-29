@@ -426,3 +426,8 @@ FodyWeavers.xsd
 
 # Official VS Code C# Dev Kit Extension exclusion
 #*.lscache
+
+# local package output and build output
+nupkg/
+[Bb]in/
+[Oo]bj/

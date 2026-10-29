@@ -1,0 +1,948 @@
+{
+  "schema": "dotnet-legacy-scan/v1",
+  "toolVersion": "0.1.0",
+  "input": "samples/LegacyShop/LegacyShop.sln",
+  "scannedAt": "2026-10-29T13:42:06.3324973+01:00",
+  "summary": {
+    "projects": 7,
+    "modernProjects": 1,
+    "linesOfCode": 100,
+    "blockers": 6,
+    "major": 15,
+    "minor": 20,
+    "difficulty": "High",
+    "complexityScore": 80,
+    "estimatedHoursLow": 267,
+    "estimatedHoursHigh": 570,
+    "hoursPerDay": 6
+  },
+  "migrationOrder": [
+    "LegacyShop.Core",
+    "LegacyShop.Modern",
+    "LegacyShop.Admin",
+    "LegacyShop.Reports",
+    "LegacyShop.Services",
+    "LegacyShop.Web",
+    "LegacyShop.Tests"
+  ],
+  "warnings": [],
+  "projects": [
+    {
+      "name": "LegacyShop.Core",
+      "path": "LegacyShop.Core/LegacyShop.Core.csproj",
+      "language": "C#",
+      "kind": "classLibrary",
+      "isSdkStyle": false,
+      "isModernAlready": false,
+      "targetFramework": "net461",
+      "sourceFiles": 1,
+      "linesOfCode": 25,
+      "estimatedHours": 31.7,
+      "recommendedTarget": "Remove System.Web dependencies, then multi-target net48;net10.0 (or netstandard2.0).",
+      "projectReferences": [],
+      "packages": [
+        "EntityFramework 6.1.3",
+        "log4net 2.0.8"
+      ],
+      "findings": [
+        {
+          "id": "DATA001",
+          "title": "Entity Framework EDMX model (database-first designer)",
+          "severity": "major",
+          "category": "Data",
+          "count": 1,
+          "estimatedHours": 12,
+          "guidance": "EF6 (6.4\u002B) runs on modern .NET, but the EDMX designer does not. Short term: keep EF6 with code-based configuration. Long term: reverse-engineer to EF Core.",
+          "occurrences": [
+            {
+              "file": "Model.edmx",
+              "line": 1,
+              "snippet": "Model.edmx"
+            }
+          ]
+        },
+        {
+          "id": "CODE003",
+          "title": "BinaryFormatter / NetDataContractSerializer",
+          "severity": "major",
+          "category": "Code",
+          "count": 1,
+          "estimatedHours": 4,
+          "guidance": "BinaryFormatter is removed from .NET 9\u002B. Replace with System.Text.Json, DataContractSerializer or MessagePack. Check persisted data that was serialized with it.",
+          "occurrences": [
+            {
+              "file": "CartService.cs",
+              "line": 22,
+              "snippet": "var formatter = new BinaryFormatter();"
+            }
+          ]
+        },
+        {
+          "id": "CODE002",
+          "title": "System.Web used in a non-web library",
+          "severity": "major",
+          "category": "Code",
+          "count": 1,
+          "estimatedHours": 2.5,
+          "guidance": "Remove System.Web dependencies from business libraries (abstractions for request/user/cache) so they can multi-target net48 and net10.0.",
+          "occurrences": [
+            {
+              "file": "CartService.cs",
+              "line": 6,
+              "snippet": "using System.Web;"
+            }
+          ]
+        },
+        {
+          "id": "CODE001",
+          "title": "HttpContext.Current (static access)",
+          "severity": "major",
+          "category": "Code",
+          "count": 1,
+          "estimatedHours": 0.5,
+          "guidance": "Inject IHttpContextAccessor or pass the needed values explicitly. In shared libraries this is often the biggest hidden cost.",
+          "occurrences": [
+            {
+              "file": "CartService.cs",
+              "line": 18,
+              "snippet": "public string CurrentUser =\u003E HttpContext.Current.User.Identity.Name;"
+            }
+          ]
+        },
+        {
+          "id": "PRJ001",
+          "title": "Legacy (non-SDK) project format",
+          "severity": "minor",
+          "category": "Project",
+          "count": 1,
+          "estimatedHours": 2,
+          "guidance": "Convert to SDK-style csproj (try-convert or by hand). Do this first; it makes every later step easier and can be done while still targeting net48.",
+          "occurrences": [
+            {
+              "file": "LegacyShop.Core/LegacyShop.Core.csproj",
+              "line": 1,
+              "snippet": "ToolsVersion / non-SDK project"
+            }
+          ]
+        },
+        {
+          "id": "PRJ003",
+          "title": "Targets an old .NET Framework version (\u003C 4.7.2)",
+          "severity": "minor",
+          "category": "Project",
+          "count": 1,
+          "estimatedHours": 2,
+          "guidance": "Retarget to net48 first. It gives netstandard2.0 compatibility and lets you share libraries with the new .NET app during an incremental migration.",
+          "occurrences": [
+            {
+              "file": "LegacyShop.Core/LegacyShop.Core.csproj",
+              "line": 1,
+              "snippet": "net461"
+            }
+          ]
+        },
+        {
+          "id": "DATA002",
+          "title": "Entity Framework 6",
+          "severity": "minor",
+          "category": "Data",
+          "count": 1,
+          "estimatedHours": 2,
+          "guidance": "EF 6.4\u002B runs on modern .NET. Upgrade the package first and migrate to EF Core later as a separate step to reduce risk.",
+          "occurrences": [
+            {
+              "file": "packages",
+              "line": 0,
+              "snippet": "EntityFramework 6.1.3"
+            }
+          ]
+        },
+        {
+          "id": "CODE009",
+          "title": "ConfigurationManager / web.config appSettings",
+          "severity": "minor",
+          "category": "Code",
+          "count": 1,
+          "estimatedHours": 1.1,
+          "guidance": "Either add System.Configuration.ConfigurationManager package (quick) or move to IConfiguration/Options (recommended for web apps).",
+          "occurrences": [
+            {
+              "file": "CartService.cs",
+              "line": 26,
+              "snippet": "public SqlConnection Open() =\u003E new SqlConnection(ConfigurationManager.ConnectionStrings[\u0022Shop\u0022].ConnectionString);"
+            }
+          ]
+        },
+        {
+          "id": "PRJ002",
+          "title": "packages.config NuGet format",
+          "severity": "minor",
+          "category": "Project",
+          "count": 1,
+          "estimatedHours": 1,
+          "guidance": "Migrate to PackageReference (Visual Studio: right-click packages.config \u2192 Migrate). Review transitive dependencies afterwards.",
+          "occurrences": [
+            {
+              "file": "packages.config",
+              "line": 1,
+              "snippet": "packages.config"
+            }
+          ]
+        },
+        {
+          "id": "PKG002",
+          "title": "NuGet package needs a major upgrade or swap to its ASP.NET Core variant",
+          "severity": "minor",
+          "category": "Packages",
+          "count": 1,
+          "estimatedHours": 1,
+          "guidance": "Upgrade to a version that supports netstandard2.0/net8\u002B or switch to the .AspNetCore / .Extensions.DependencyInjection variant.",
+          "occurrences": [
+            {
+              "file": "packages",
+              "line": 0,
+              "snippet": "log4net 2.0.8 upgrade to 2.0.10\u002B (or move to Microsoft.Extensions.Logging)"
+            }
+          ]
+        },
+        {
+          "id": "CODE011",
+          "title": "HttpRuntime.Cache / System.Web.Caching",
+          "severity": "minor",
+          "category": "Code",
+          "count": 1,
+          "estimatedHours": 0.5,
+          "guidance": "Replace with IMemoryCache / IDistributedCache.",
+          "occurrences": [
+            {
+              "file": "CartService.cs",
+              "line": 28,
+              "snippet": "public object CachedPrices() =\u003E HttpRuntime.Cache[\u0022prices\u0022];"
+            }
+          ]
+        },
+        {
+          "id": "DATA003",
+          "title": "System.Data.SqlClient",
+          "severity": "minor",
+          "category": "Data",
+          "count": 1,
+          "estimatedHours": 0.1,
+          "guidance": "Switch to Microsoft.Data.SqlClient (note: Encrypt=true is the default, which may require TrustServerCertificate or proper certificates).",
+          "occurrences": [
+            {
+              "file": "CartService.cs",
+              "line": 3,
+              "snippet": "using System.Data.SqlClient;"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "LegacyShop.Web",
+      "path": "LegacyShop.Web/LegacyShop.Web.csproj",
+      "language": "C#",
+      "kind": "webForms",
+      "isSdkStyle": false,
+      "isModernAlready": false,
+      "targetFramework": "net472",
+      "sourceFiles": 4,
+      "linesOfCode": 48,
+      "estimatedHours": 105.8,
+      "recommendedTarget": "New ASP.NET Core app (Blazor or Razor Pages). Migrate page by page behind YARP, share auth/session via System.Web adapters.",
+      "projectReferences": [
+        "LegacyShop.Core",
+        "LegacyShop.Services"
+      ],
+      "packages": [
+        "Microsoft.AspNet.FriendlyUrls 1.0.2",
+        "AjaxControlToolkit 20.1.0",
+        "Microsoft.AspNet.ScriptManager.MSAjax 5.0.0",
+        "Elmah 1.2.2"
+      ],
+      "findings": [
+        {
+          "id": "APP001",
+          "title": "ASP.NET Web Forms pages",
+          "severity": "blocker",
+          "category": "Web",
+          "count": 3,
+          "estimatedHours": 34,
+          "guidance": "Web Forms does not exist on modern .NET. Rewrite the UI (Blazor or Razor Pages). Migrate incrementally: put an ASP.NET Core app with YARP in front, move pages one by one, and share session/auth with System.Web adapters.",
+          "occurrences": [
+            {
+              "file": "Cart.aspx",
+              "line": 1,
+              "snippet": "Cart.aspx"
+            },
+            {
+              "file": "Default.aspx",
+              "line": 1,
+              "snippet": "Default.aspx"
+            },
+            {
+              "file": "Checkout.aspx",
+              "line": 1,
+              "snippet": "Checkout.aspx"
+            }
+          ]
+        },
+        {
+          "id": "SEC001",
+          "title": "ASP.NET Membership / Forms Authentication / Roles",
+          "severity": "blocker",
+          "category": "Security",
+          "count": 3,
+          "estimatedHours": 24,
+          "guidance": "Move to ASP.NET Core Identity (or an external IdP). Plan the user/password-hash data migration and keep a compatible password hasher so users do not need to reset passwords.",
+          "occurrences": [
+            {
+              "file": "Web.config",
+              "line": 5,
+              "snippet": "\u003Cmembership\u003E"
+            },
+            {
+              "file": "Web.config",
+              "line": 6,
+              "snippet": "\u003CroleManager\u003E"
+            },
+            {
+              "file": "Web.config",
+              "line": 4,
+              "snippet": "\u003Cauthentication mode=\u0022Forms\u0022\u003E"
+            }
+          ]
+        },
+        {
+          "id": "APP002",
+          "title": "Web Forms user controls / master pages",
+          "severity": "blocker",
+          "category": "Web",
+          "count": 2,
+          "estimatedHours": 6,
+          "guidance": "Rewrite as Blazor components / Razor layouts and partials.",
+          "occurrences": [
+            {
+              "file": "Controls/MiniCart.ascx",
+              "line": 1,
+              "snippet": "MiniCart.ascx"
+            },
+            {
+              "file": "Site.Master",
+              "line": 1,
+              "snippet": "Site.Master"
+            }
+          ]
+        },
+        {
+          "id": "PKG001",
+          "title": "NuGet package with no modern .NET equivalent (needs replacement)",
+          "severity": "major",
+          "category": "Packages",
+          "count": 4,
+          "estimatedHours": 12,
+          "guidance": "Find the ASP.NET Core / modern replacement for each listed package.",
+          "occurrences": [
+            {
+              "file": "packages",
+              "line": 0,
+              "snippet": "Microsoft.AspNet.FriendlyUrls 1.0.2 Web Forms only"
+            },
+            {
+              "file": "packages",
+              "line": 0,
+              "snippet": "AjaxControlToolkit 20.1.0 Web Forms only"
+            },
+            {
+              "file": "packages",
+              "line": 0,
+              "snippet": "Microsoft.AspNet.ScriptManager.MSAjax 5.0.0 Web Forms only"
+            },
+            {
+              "file": "packages",
+              "line": 0,
+              "snippet": "Elmah 1.2.2 \u2192 ILogger \u002B Serilog/Seq/Application Insights"
+            }
+          ]
+        },
+        {
+          "id": "APP009",
+          "title": "WCF client / service references",
+          "severity": "major",
+          "category": "Services",
+          "count": 2,
+          "estimatedHours": 8,
+          "guidance": "Regenerate clients with dotnet-svcutil (System.ServiceModel.* packages). Only some bindings are supported (basicHttp, netTcp, wsHttp partially); check each endpoint\u0027s binding.",
+          "occurrences": [
+            {
+              "file": "Service References/PaymentService/Reference.svcmap",
+              "line": 1,
+              "snippet": "Reference.svcmap"
+            },
+            {
+              "file": "Web.config",
+              "line": 14,
+              "snippet": "client endpoint binding=\u0022wsHttpBinding\u0022"
+            }
+          ]
+        },
+        {
+          "id": "WEB001",
+          "title": "Out-of-process or heavy Session state",
+          "severity": "major",
+          "category": "Web",
+          "count": 4,
+          "estimatedHours": 7,
+          "guidance": "ASP.NET Core session is different (no SQLServer/StateServer modes, values are byte[]). During incremental migration share session via System.Web adapters.",
+          "occurrences": [
+            {
+              "file": "Cart.aspx.cs",
+              "line": 9,
+              "snippet": "var count = Session[\u0022CartCount\u0022];"
+            },
+            {
+              "file": "Checkout.aspx.cs",
+              "line": 9,
+              "snippet": "var count = Session[\u0022CartCount\u0022];"
+            },
+            {
+              "file": "Default.aspx.cs",
+              "line": 9,
+              "snippet": "var count = Session[\u0022CartCount\u0022];"
+            },
+            {
+              "file": "Web.config",
+              "line": 7,
+              "snippet": "\u003CsessionState mode=\u0022SQLServer\u0022\u003E"
+            }
+          ]
+        },
+        {
+          "id": "APP007",
+          "title": "Custom IHttpModule / IHttpHandler",
+          "severity": "major",
+          "category": "Web",
+          "count": 1,
+          "estimatedHours": 4,
+          "guidance": "Rewrite as ASP.NET Core middleware or endpoints.",
+          "occurrences": [
+            {
+              "file": "Modules/AuditModule.cs",
+              "line": 4,
+              "snippet": "public class AuditModule : IHttpModule"
+            }
+          ]
+        },
+        {
+          "id": "APP006",
+          "title": "Global.asax application events",
+          "severity": "major",
+          "category": "Web",
+          "count": 1,
+          "estimatedHours": 4,
+          "guidance": "Move Application_Start/Error/BeginRequest logic into Program.cs and middleware.",
+          "occurrences": [
+            {
+              "file": "Global.asax",
+              "line": 1,
+              "snippet": "Global.asax"
+            }
+          ]
+        },
+        {
+          "id": "PRJ001",
+          "title": "Legacy (non-SDK) project format",
+          "severity": "minor",
+          "category": "Project",
+          "count": 1,
+          "estimatedHours": 2,
+          "guidance": "Convert to SDK-style csproj (try-convert or by hand). Do this first; it makes every later step easier and can be done while still targeting net48.",
+          "occurrences": [
+            {
+              "file": "LegacyShop.Web/LegacyShop.Web.csproj",
+              "line": 1,
+              "snippet": "ToolsVersion / non-SDK project"
+            }
+          ]
+        },
+        {
+          "id": "PRJ002",
+          "title": "packages.config NuGet format",
+          "severity": "minor",
+          "category": "Project",
+          "count": 1,
+          "estimatedHours": 1,
+          "guidance": "Migrate to PackageReference (Visual Studio: right-click packages.config \u2192 Migrate). Review transitive dependencies afterwards.",
+          "occurrences": [
+            {
+              "file": "packages.config",
+              "line": 1,
+              "snippet": "packages.config"
+            }
+          ]
+        },
+        {
+          "id": "CODE012",
+          "title": "Server.MapPath / HostingEnvironment",
+          "severity": "minor",
+          "category": "Code",
+          "count": 3,
+          "estimatedHours": 0.75,
+          "guidance": "Use IWebHostEnvironment.ContentRootPath / WebRootPath.",
+          "occurrences": [
+            {
+              "file": "Cart.aspx.cs",
+              "line": 10,
+              "snippet": "var file = Server.MapPath(\u0022~/App_Data/data.xml\u0022);"
+            },
+            {
+              "file": "Checkout.aspx.cs",
+              "line": 10,
+              "snippet": "var file = Server.MapPath(\u0022~/App_Data/data.xml\u0022);"
+            },
+            {
+              "file": "Default.aspx.cs",
+              "line": 10,
+              "snippet": "var file = Server.MapPath(\u0022~/App_Data/data.xml\u0022);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "LegacyShop.Services",
+      "path": "LegacyShop.Services/LegacyShop.Services.csproj",
+      "language": "C#",
+      "kind": "wcfService",
+      "isSdkStyle": false,
+      "isModernAlready": false,
+      "targetFramework": "net48",
+      "sourceFiles": 1,
+      "linesOfCode": 10,
+      "estimatedHours": 39,
+      "recommendedTarget": "CoreWCF on net10.0 (keeps contracts/clients) or redesign as gRPC / REST.",
+      "projectReferences": [
+        "LegacyShop.Core"
+      ],
+      "packages": [],
+      "findings": [
+        {
+          "id": "APP008",
+          "title": "WCF service hosting (.svc / system.serviceModel services)",
+          "severity": "blocker",
+          "category": "Services",
+          "count": 2,
+          "estimatedHours": 24,
+          "guidance": "Server-side WCF is not part of modern .NET. Options: CoreWCF (closest, keeps contracts and clients), or redesign to gRPC / REST. Choose per client: who consumes this service and can they change?",
+          "occurrences": [
+            {
+              "file": "InventoryService.svc",
+              "line": 1,
+              "snippet": "InventoryService.svc"
+            },
+            {
+              "file": "OrderService.svc",
+              "line": 1,
+              "snippet": "OrderService.svc"
+            }
+          ]
+        },
+        {
+          "id": "APP010",
+          "title": "ASMX web services",
+          "severity": "blocker",
+          "category": "Services",
+          "count": 1,
+          "estimatedHours": 10,
+          "guidance": "Not supported on modern .NET. Re-implement as Web API endpoints or host with CoreWCF (basicHttpBinding) to keep the SOAP contract for existing clients.",
+          "occurrences": [
+            {
+              "file": "Legacy.asmx",
+              "line": 1,
+              "snippet": "Legacy.asmx"
+            }
+          ]
+        },
+        {
+          "id": "PRJ001",
+          "title": "Legacy (non-SDK) project format",
+          "severity": "minor",
+          "category": "Project",
+          "count": 1,
+          "estimatedHours": 2,
+          "guidance": "Convert to SDK-style csproj (try-convert or by hand). Do this first; it makes every later step easier and can be done while still targeting net48.",
+          "occurrences": [
+            {
+              "file": "LegacyShop.Services/LegacyShop.Services.csproj",
+              "line": 1,
+              "snippet": "ToolsVersion / non-SDK project"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "LegacyShop.Admin",
+      "path": "LegacyShop.Admin/LegacyShop.Admin.csproj",
+      "language": "C#",
+      "kind": "aspNetMvc",
+      "isSdkStyle": false,
+      "isModernAlready": false,
+      "targetFramework": "net48",
+      "sourceFiles": 2,
+      "linesOfCode": 4,
+      "estimatedHours": 63.5,
+      "recommendedTarget": "ASP.NET Core MVC on net10.0. Large apps: incremental migration with YARP \u002B System.Web adapters.",
+      "projectReferences": [
+        "LegacyShop.Core"
+      ],
+      "packages": [
+        "Microsoft.AspNet.Mvc 5.2.7",
+        "Microsoft.AspNet.WebApi.Core 5.2.7",
+        "Microsoft.AspNet.Identity.Core 2.2.3",
+        "Microsoft.Owin.Security.Cookies 4.1.0",
+        "Microsoft.AspNet.Web.Optimization 1.1.3",
+        "Autofac.Mvc5 4.0.2",
+        "EntityFramework 6.4.4"
+      ],
+      "findings": [
+        {
+          "id": "PKG001",
+          "title": "NuGet package with no modern .NET equivalent (needs replacement)",
+          "severity": "major",
+          "category": "Packages",
+          "count": 5,
+          "estimatedHours": 15,
+          "guidance": "Find the ASP.NET Core / modern replacement for each listed package.",
+          "occurrences": [
+            {
+              "file": "packages",
+              "line": 0,
+              "snippet": "Microsoft.AspNet.Mvc 5.2.7 \u2192 ASP.NET Core MVC (built in)"
+            },
+            {
+              "file": "packages",
+              "line": 0,
+              "snippet": "Microsoft.AspNet.WebApi.Core 5.2.7 \u2192 ASP.NET Core controllers (built in)"
+            },
+            {
+              "file": "packages",
+              "line": 0,
+              "snippet": "Microsoft.AspNet.Identity.Core 2.2.3 \u2192 Microsoft.AspNetCore.Identity"
+            },
+            {
+              "file": "packages",
+              "line": 0,
+              "snippet": "Microsoft.Owin.Security.Cookies 4.1.0 OWIN middleware \u2192 ASP.NET Core middleware"
+            },
+            {
+              "file": "packages",
+              "line": 0,
+              "snippet": "Microsoft.AspNet.Web.Optimization 1.1.3 bundling \u2192 WebOptimizer / build-time bundling"
+            }
+          ]
+        },
+        {
+          "id": "APP003",
+          "title": "ASP.NET MVC 5 (System.Web.Mvc)",
+          "severity": "major",
+          "category": "Web",
+          "count": 1,
+          "estimatedHours": 13.5,
+          "guidance": "Move controllers to ASP.NET Core MVC. Most action code ports with small changes; filters, model binders, bundling, routing and HtmlHelpers need rework.",
+          "occurrences": [
+            {
+              "file": "Controllers/HomeController.cs",
+              "line": 1,
+              "snippet": "controller"
+            }
+          ]
+        },
+        {
+          "id": "SEC002",
+          "title": "ASP.NET Identity 2 / OWIN auth",
+          "severity": "major",
+          "category": "Security",
+          "count": 1,
+          "estimatedHours": 12,
+          "guidance": "Move to ASP.NET Core Identity. Schema is similar but not identical; plan a migration script.",
+          "occurrences": [
+            {
+              "file": "packages",
+              "line": 0,
+              "snippet": "Microsoft.AspNet.Identity / Microsoft.Owin.Security"
+            }
+          ]
+        },
+        {
+          "id": "APP005",
+          "title": "ASP.NET Web API 2 (System.Web.Http)",
+          "severity": "major",
+          "category": "Web",
+          "count": 1,
+          "estimatedHours": 9,
+          "guidance": "Port ApiControllers to ASP.NET Core controllers. Check message handlers, formatters and OWIN middleware.",
+          "occurrences": [
+            {
+              "file": "Controllers/OrdersApiController.cs",
+              "line": 1,
+              "snippet": "ApiController"
+            }
+          ]
+        },
+        {
+          "id": "APP006",
+          "title": "Global.asax application events",
+          "severity": "major",
+          "category": "Web",
+          "count": 1,
+          "estimatedHours": 4,
+          "guidance": "Move Application_Start/Error/BeginRequest logic into Program.cs and middleware.",
+          "occurrences": [
+            {
+              "file": "Global.asax",
+              "line": 1,
+              "snippet": "Global.asax"
+            }
+          ]
+        },
+        {
+          "id": "PRJ001",
+          "title": "Legacy (non-SDK) project format",
+          "severity": "minor",
+          "category": "Project",
+          "count": 1,
+          "estimatedHours": 2,
+          "guidance": "Convert to SDK-style csproj (try-convert or by hand). Do this first; it makes every later step easier and can be done while still targeting net48.",
+          "occurrences": [
+            {
+              "file": "LegacyShop.Admin/LegacyShop.Admin.csproj",
+              "line": 1,
+              "snippet": "ToolsVersion / non-SDK project"
+            }
+          ]
+        },
+        {
+          "id": "DATA002",
+          "title": "Entity Framework 6",
+          "severity": "minor",
+          "category": "Data",
+          "count": 1,
+          "estimatedHours": 2,
+          "guidance": "EF 6.4\u002B runs on modern .NET. Upgrade the package first and migrate to EF Core later as a separate step to reduce risk.",
+          "occurrences": [
+            {
+              "file": "packages",
+              "line": 0,
+              "snippet": "EntityFramework 6.4.4"
+            }
+          ]
+        },
+        {
+          "id": "PRJ002",
+          "title": "packages.config NuGet format",
+          "severity": "minor",
+          "category": "Project",
+          "count": 1,
+          "estimatedHours": 1,
+          "guidance": "Migrate to PackageReference (Visual Studio: right-click packages.config \u2192 Migrate). Review transitive dependencies afterwards.",
+          "occurrences": [
+            {
+              "file": "packages.config",
+              "line": 1,
+              "snippet": "packages.config"
+            }
+          ]
+        },
+        {
+          "id": "APP004",
+          "title": "Razor views (MVC 5)",
+          "severity": "minor",
+          "category": "Web",
+          "count": 2,
+          "estimatedHours": 1,
+          "guidance": "Views usually port with small changes: replace @Html/@Url helpers, bundling (@Scripts/@Styles) and child actions with tag helpers / view components.",
+          "occurrences": [
+            {
+              "file": "Views/Shared/_Layout.cshtml",
+              "line": 1,
+              "snippet": "_Layout.cshtml"
+            },
+            {
+              "file": "Views/Home/Index.cshtml",
+              "line": 1,
+              "snippet": "Index.cshtml"
+            }
+          ]
+        },
+        {
+          "id": "PKG002",
+          "title": "NuGet package needs a major upgrade or swap to its ASP.NET Core variant",
+          "severity": "minor",
+          "category": "Packages",
+          "count": 1,
+          "estimatedHours": 1,
+          "guidance": "Upgrade to a version that supports netstandard2.0/net8\u002B or switch to the .AspNetCore / .Extensions.DependencyInjection variant.",
+          "occurrences": [
+            {
+              "file": "packages",
+              "line": 0,
+              "snippet": "Autofac.Mvc5 4.0.2 \u2192 Autofac.Extensions.DependencyInjection"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "LegacyShop.Reports",
+      "path": "LegacyShop.Reports/LegacyShop.Reports.vbproj",
+      "language": "VB.NET",
+      "kind": "classLibrary",
+      "isSdkStyle": false,
+      "isModernAlready": false,
+      "targetFramework": "net452",
+      "sourceFiles": 1,
+      "linesOfCode": 11,
+      "estimatedHours": 29.1,
+      "recommendedTarget": "Multi-target net48;net10.0 (or netstandard2.0). Good first candidate.",
+      "projectReferences": [],
+      "packages": [],
+      "findings": [
+        {
+          "id": "RPT001",
+          "title": "Crystal Reports / ReportViewer",
+          "severity": "blocker",
+          "category": "Reporting",
+          "count": 1,
+          "estimatedHours": 20,
+          "guidance": "No direct support on modern .NET web. Options: keep a small .NET Framework reporting service, move to SSRS/Power BI embedding, or a .NET reporting library.",
+          "occurrences": [
+            {
+              "file": "packages",
+              "line": 0,
+              "snippet": "CrystalDecisions.CrystalReports.Engine Crystal Reports"
+            }
+          ]
+        },
+        {
+          "id": "CODE005",
+          "title": "Thread.Abort / Suspend / Resume",
+          "severity": "major",
+          "category": "Code",
+          "count": 1,
+          "estimatedHours": 2,
+          "guidance": "Throws PlatformNotSupportedException. Use CancellationToken-based cooperative cancellation.",
+          "occurrences": [
+            {
+              "file": "ReportRunner.vb",
+              "line": 11,
+              "snippet": "Thread.CurrentThread.Abort()"
+            }
+          ]
+        },
+        {
+          "id": "PRJ001",
+          "title": "Legacy (non-SDK) project format",
+          "severity": "minor",
+          "category": "Project",
+          "count": 1,
+          "estimatedHours": 2,
+          "guidance": "Convert to SDK-style csproj (try-convert or by hand). Do this first; it makes every later step easier and can be done while still targeting net48.",
+          "occurrences": [
+            {
+              "file": "LegacyShop.Reports/LegacyShop.Reports.vbproj",
+              "line": 1,
+              "snippet": "ToolsVersion / non-SDK project"
+            }
+          ]
+        },
+        {
+          "id": "PRJ003",
+          "title": "Targets an old .NET Framework version (\u003C 4.7.2)",
+          "severity": "minor",
+          "category": "Project",
+          "count": 1,
+          "estimatedHours": 2,
+          "guidance": "Retarget to net48 first. It gives netstandard2.0 compatibility and lets you share libraries with the new .NET app during an incremental migration.",
+          "occurrences": [
+            {
+              "file": "LegacyShop.Reports/LegacyShop.Reports.vbproj",
+              "line": 1,
+              "snippet": "net452"
+            }
+          ]
+        },
+        {
+          "id": "CODE010",
+          "title": "Windows-only APIs (Registry, System.Drawing, EventLog, WMI)",
+          "severity": "info",
+          "category": "Code",
+          "count": 1,
+          "estimatedHours": 0.1,
+          "guidance": "Fine on Windows. If you plan to run on Linux/containers, these need replacing (e.g. System.Drawing \u2192 ImageSharp/SkiaSharp).",
+          "occurrences": [
+            {
+              "file": "ReportRunner.vb",
+              "line": 10,
+              "snippet": "Dim key = Registry.CurrentUser.OpenSubKey(\u0022Software\\Shop\u0022)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "LegacyShop.Tests",
+      "path": "LegacyShop.Tests/LegacyShop.Tests.csproj",
+      "language": "C#",
+      "kind": "test",
+      "isSdkStyle": false,
+      "isModernAlready": false,
+      "targetFramework": "net48",
+      "sourceFiles": 1,
+      "linesOfCode": 1,
+      "estimatedHours": 5,
+      "recommendedTarget": "net10.0, same test framework with updated packages. Migrate together with the project under test.",
+      "projectReferences": [
+        "LegacyShop.Core"
+      ],
+      "packages": [],
+      "findings": [
+        {
+          "id": "PRJ001",
+          "title": "Legacy (non-SDK) project format",
+          "severity": "minor",
+          "category": "Project",
+          "count": 1,
+          "estimatedHours": 2,
+          "guidance": "Convert to SDK-style csproj (try-convert or by hand). Do this first; it makes every later step easier and can be done while still targeting net48.",
+          "occurrences": [
+            {
+              "file": "LegacyShop.Tests/LegacyShop.Tests.csproj",
+              "line": 1,
+              "snippet": "ToolsVersion / non-SDK project"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "LegacyShop.Modern",
+      "path": "LegacyShop.Modern/LegacyShop.Modern.csproj",
+      "language": "C#",
+      "kind": "classLibrary",
+      "isSdkStyle": true,
+      "isModernAlready": true,
+      "targetFramework": "net8.0",
+      "sourceFiles": 1,
+      "linesOfCode": 1,
+      "estimatedHours": 0,
+      "recommendedTarget": "Already on modern .NET",
+      "projectReferences": [
+        "LegacyShop.Core"
+      ],
+      "packages": [],
+      "findings": []
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LegacyShop.Core", "LegacyShop.Core\LegacyShop.Core.csproj", "{00000000-0000-0000-0000-000000000000}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LegacyShop.Web", "LegacyShop.Web\LegacyShop.Web.csproj", "{00000001-0000-0000-0000-000000000000}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LegacyShop.Services", "LegacyShop.Services\LegacyShop.Services.csproj", "{00000002-0000-0000-0000-000000000000}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LegacyShop.Admin", "LegacyShop.Admin\LegacyShop.Admin.csproj", "{00000003-0000-0000-0000-000000000000}"
+EndProject
+Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "LegacyShop.Reports", "LegacyShop.Reports\LegacyShop.Reports.vbproj", "{00000004-0000-0000-0000-000000000000}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LegacyShop.Tests", "LegacyShop.Tests\LegacyShop.Tests.csproj", "{00000005-0000-0000-0000-000000000000}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LegacyShop.Modern", "LegacyShop.Modern\LegacyShop.Modern.csproj", "{00000006-0000-0000-0000-000000000000}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{99999999-0000-0000-0000-000000000000}"
+EndProject
+Global
+EndGlobal

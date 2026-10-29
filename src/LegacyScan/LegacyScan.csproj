@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RollForward>Major</RollForward>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>LegacyScan</RootNamespace>
+
+    <!-- dotnet tool packaging -->
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>dotnet-legacy-scan</ToolCommandName>
+    <PackageId>dotnet-legacy-scan</PackageId>
+    <RepositoryUrl>https://github.com/dejanciev-dev/dotnet-legacy-scan</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageProjectUrl>https://github.com/dejanciev-dev/dotnet-legacy-scan</PackageProjectUrl>
+    <Version>0.1.0</Version>
+    <Authors>Dejan</Authors>
+    <Description>Scans .NET Framework solutions and produces a migration readiness report (blockers, effort estimate, recommended order) for moving to modern .NET.</Description>
+    <PackageTags>dotnet;migration;modernization;webforms;wcf;net-framework;upgrade</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageOutputPath>../../nupkg</PackageOutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="../../README.md" Pack="true" PackagePath="/" />
+    <InternalsVisibleTo Include="LegacyScan.Tests" />
+  </ItemGroup>
+
+</Project>

@@ -214,7 +214,7 @@ public static class HtmlReport
         .method{font-size:14px;color:var(--muted)}.method h2{color:var(--text)}
         footer{margin-top:40px;border-top:1px solid var(--border);padding-top:18px}
         .cta{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;font-size:15px}
-        @media print{body{background:#fff}details{display:block}details>*{display:block}.finding summary{list-style:none}.card,.project,.table-wrap{break-inside:avoid}}
+        @media print{body{background:#fff}details{display:block}details>*{display:block}details::details-content{content-visibility:visible;display:block}.finding summary{list-style:none}.card,.project,.table-wrap{break-inside:avoid}}
         @media (max-width:600px){main{padding:24px 16px 48px}h1{font-size:24px}.finding .meta{margin-left:0;width:100%}}
         """;
 }

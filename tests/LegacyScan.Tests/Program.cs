@@ -30,6 +30,36 @@ Test("VB comments, REM and strings are blanked", () =>
     True(s.Contains("Remove()"), "identifier starting with Rem kept");
 });
 
+Test("C# interpolation holes keep code, strings inside holes are blanked", () =>
+{
+    var s = CodeScanner.StripCSharp("var a = $\"{HttpContext.Current.User} {(x ? \"BinaryFormatter\" : \"y\")} {{Thread.Abort}}\"; Real();");
+    True(s.Contains("HttpContext.Current.User"), "hole code kept: " + s);
+    True(!s.Contains("BinaryFormatter") && !s.Contains("Thread.Abort"), "nested string and {{ }} text blanked: " + s);
+    True(s.Contains("Real()"), "code after string kept");
+});
+Test("C# raw strings with 4 quotes and $$ holes", () =>
+{
+    var s = CodeScanner.StripCSharp("var a = \"\"\"\"\n has \"\"\" inside BinaryFormatter\n \"\"\"\";\nvar b = $$\"\"\"\n {{HttpContext.Current}} {x} BinaryFormatter\n \"\"\";\nReal();");
+    True(!s.Contains("BinaryFormatter"), "raw content blanked: " + s);
+    True(s.Contains("HttpContext.Current") && s.Contains("Real()"), "code after raw string and in $$ hole kept: " + s);
+    Eq(7, s.Split('\n').Length, "line count");
+});
+Test("pattern false positives: member Session[], ThreadPool.Resume()", () =>
+{
+    bool Hits(Rule rule, string line) => CodeScanner.Patterns.Any(p => p.Rule == rule && p.Regex.IsMatch(line));
+    True(Hits(Rules.SessionState, "var c = Session[\"x\"];"), "Session[ on page");
+    True(Hits(Rules.SessionState, "HttpContext.Current.Session.Abandon();"), "HttpContext.Current.Session");
+    True(!Hits(Rules.SessionState, "var v = viewModel.Session[0];"), "member Session[ ignored");
+    True(Hits(Rules.ThreadAbort, "_workerThread.Abort();"), "thread variable");
+    True(!Hits(Rules.ThreadAbort, "myThreadPool.Resume();"), "ThreadPool ignored");
+});
+Test("generated code is counted as lines but not scanned", () =>
+{
+    True(CodeScanner.IsGenerated("Service References/Pay/Reference.cs"), "service reference");
+    True(CodeScanner.IsGenerated("Forms/Main.Designer.cs"), "designer");
+    True(!CodeScanner.IsGenerated("Services/OrderService.cs"), "normal file");
+});
+
 Console.WriteLine("Solution");
 Test("all projects from .sln are found, solution folders skipped", () => Eq(7, report.Projects.Count));
 Test("directory input finds the single solution", () => Eq(7, Scanner.Scan(Path.GetDirectoryName(sample)!).Projects.Count));
@@ -192,6 +222,35 @@ try
         Fixture("client/Client/packages.config", """<packages><package id="Microsoft.AspNet.WebApi.Client" version="5.2.7" /></packages>""");
         var p = ProjectAnalyzer.Analyze(Fixture("client/Client/Client.csproj", Legacy()), temp);
         True(p.Findings.All(f => f.Rule != Rules.PackageNeedsReplacement), "WebApi.Client is netstandard2.0");
+    });
+    Test("ASMX Web References and report files are detected", () =>
+    {
+        Fixture("refs/App/Web References/Legacy/Reference.map", "<DiscoveryClientResultsFile />");
+        Fixture("refs/App/Reports/Invoice.rpt", "");
+        Fixture("refs/App/Reports/Orders.rdlc", "<Report />");
+        var p = ProjectAnalyzer.Analyze(Fixture("refs/App/App.csproj", Legacy()), temp);
+        Eq(1, p.Findings.Single(f => f.Rule == Rules.WcfClient).Occurrences.Count, "web reference");
+        Eq(2, p.Findings.Single(f => f.Rule == Rules.Reporting).Occurrences.Count, "report files");
+    });
+    Test("membership/forms settings outside system.web are ignored", () =>
+    {
+        Fixture("cfg/Lib/app.config", "<configuration><mySection><profile name=\"x\" /><membership /></mySection></configuration>");
+        var p = ProjectAnalyzer.Analyze(Fixture("cfg/Lib/Lib.csproj", Legacy()), temp);
+        True(p.Findings.All(f => f.Rule != Rules.MembershipAuth), "no membership");
+    });
+    Test("Web Site projects in a .sln and in a folder produce a warning", () =>
+    {
+        Fixture("site/WebSite1/App_Code/Util.cs", "class Util { }");
+        Fixture("site/WebSite1/Default.aspx", "<%@ Page %>");
+        var sln = Fixture("site/Site.sln", "Project(\"{E24C65DC-7377-472B-9ABA-BC803B73C61A}\") = \"WebSite1\", \"WebSite1\\\", \"{11111111-1111-1111-1111-111111111111}\"\nEndProject\n");
+        True(Scanner.Scan(sln).Warnings.Any(w => w.Contains("Web Site project 'WebSite1'")), "sln warning");
+        True(Scanner.Scan(Path.Combine(temp, "site", "WebSite1")).Warnings.Any(w => w.Contains("looks like a Web Site")), "folder warning");
+    });
+    Test("two projects in one folder produce a warning", () =>
+    {
+        Fixture("shared/Lib/Lib.csproj", Legacy());
+        Fixture("shared/Lib/Lib.Core.csproj", """<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>""");
+        True(Scanner.Scan(Path.Combine(temp, "shared")).Warnings.Any(w => w.Contains("share the folder")), "warning");
     });
 }
 finally

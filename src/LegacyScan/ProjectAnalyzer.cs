@@ -23,7 +23,7 @@ public static partial class ProjectAnalyzer
 
     private sealed class Inventory
     {
-        public readonly List<string> Aspx = [], Ascx = [], Master = [], Svc = [], Asmx = [], Views = [], Edmx = [], Workflows = [], ServiceRefs = [], Configs = [];
+        public readonly List<string> Aspx = [], Ascx = [], Master = [], Svc = [], Asmx = [], Views = [], Edmx = [], Workflows = [], ServiceRefs = [], Configs = [], Reports = [];
         public string? GlobalAsax;
         public readonly List<string> Sources = [];
     }
@@ -136,6 +136,7 @@ public static partial class ProjectAnalyzer
         AddFiles(findings, Rules.Asmx, inv.Asmx, dir);
         AddFiles(findings, Rules.Edmx, inv.Edmx, dir);
         AddFiles(findings, Rules.WcfClient, inv.ServiceRefs, dir);
+        AddFiles(findings, Rules.Reporting, inv.Reports, dir);
         if (inv.Workflows.Count > 0 || typeGuids.Contains(TypeGuids.Workflow) || HasRef("System.Activities")) AddFiles(findings, Rules.Workflow, inv.Workflows, dir, ensure: true);
         if (inv.GlobalAsax is not null) CodeScanner.Add(findings, Rules.GlobalAsax, new Occurrence(Path.GetRelativePath(dir, inv.GlobalAsax), 1, "Global.asax"));
 
@@ -220,6 +221,7 @@ public static partial class ProjectAnalyzer
         string[] files;
         try { files = Directory.GetFiles(dir); }
         catch (UnauthorizedAccessException) { return; }
+        Array.Sort(files, StringComparer.OrdinalIgnoreCase); // same report order on Windows and Linux
 
         // Another project nested below this one owns its own folder.
         if (!isRoot && files.Any(f => f.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".vbproj", StringComparison.OrdinalIgnoreCase))) return;
@@ -245,11 +247,15 @@ public static partial class ProjectAnalyzer
                     // only the base config, not Web.Debug.config transforms
                     if (name.Count(ch => ch == '.') == 1) inv.Configs.Add(f);
                     break;
-                case ".svcmap": inv.ServiceRefs.Add(f); break;
+                case ".svcmap" or ".discomap": inv.ServiceRefs.Add(f); break;
+                case ".map" when name.Equals("Reference.map", StringComparison.OrdinalIgnoreCase): inv.ServiceRefs.Add(f); break; // ASMX Web Reference
+                case ".rpt" or ".rdlc": inv.Reports.Add(f); break;
                 case ".json" when name.Equals("ConnectedService.json", StringComparison.OrdinalIgnoreCase): inv.ServiceRefs.Add(f); break;
             }
         }
-        foreach (var sub in Directory.GetDirectories(dir))
+        var subs = Directory.GetDirectories(dir);
+        Array.Sort(subs, StringComparer.OrdinalIgnoreCase);
+        foreach (var sub in subs)
             if (!SolutionReader.IgnoredDirs.Contains(Path.GetFileName(sub)))
                 Walk(sub, projectDir, inv, isRoot: false);
     }
@@ -275,10 +281,13 @@ public static partial class ProjectAnalyzer
 
         int Line(XElement e) => ((System.Xml.IXmlLineInfo)e).LineNumber;
         IEnumerable<XElement> D(string n) => doc.Descendants().Where(e => e.Name.LocalName == n);
+        IEnumerable<XElement> SystemWeb(string n) => D(n).Where(e => e.Ancestors().Any(a => a.Name.LocalName == "system.web"));
 
-        foreach (var m in D("membership").Concat(D("roleManager").Where(e => (string?)e.Attribute("enabled") == "true")).Concat(D("profile")))
+        foreach (var m in SystemWeb("membership")
+                     .Concat(SystemWeb("roleManager").Where(e => string.Equals((string?)e.Attribute("enabled"), "true", StringComparison.OrdinalIgnoreCase)))
+                     .Concat(SystemWeb("profile")))
             CodeScanner.Add(findings, Rules.MembershipAuth, new Occurrence(rel, Line(m), $"<{m.Name.LocalName}>"));
-        foreach (var a in D("authentication").Where(e => string.Equals((string?)e.Attribute("mode"), "Forms", StringComparison.OrdinalIgnoreCase)))
+        foreach (var a in SystemWeb("authentication").Where(e => string.Equals((string?)e.Attribute("mode"), "Forms", StringComparison.OrdinalIgnoreCase)))
             CodeScanner.Add(findings, Rules.MembershipAuth, new Occurrence(rel, Line(a), "<authentication mode=\"Forms\">"));
 
         foreach (var s in D("sessionState"))

@@ -60,7 +60,7 @@ public static class Rules
     public static readonly Rule AspNetIdentity2 = new("SEC002", "ASP.NET Identity 2 / OWIN auth", Severity.Major, "Security",
         12, 0, "Move to ASP.NET Core Identity. Schema is similar but not identical; plan a migration script.");
 
-    public static readonly Rule SessionState = new("WEB001", "Out-of-process or heavy Session state", Severity.Major, "Web",
+    public static readonly Rule SessionState = new("WEB001", "ASP.NET Session state (usage or out-of-process mode)", Severity.Major, "Web",
         6, 0.25, "ASP.NET Core session is different (no SQLServer/StateServer modes, values are byte[]). During incremental migration share session via System.Web adapters.");
 
     public static readonly Rule Edmx = new("DATA001", "Entity Framework EDMX model (database-first designer)", Severity.Major, "Data",
@@ -146,6 +146,7 @@ public static class Rules
         new("Elmah", PackageNeedsReplacement, "→ ILogger + Serilog/Seq/Application Insights"),
         new("DotNetOpenAuth", PackageNeedsReplacement, "→ ASP.NET Core authentication handlers"),
         new("Microsoft.ReportViewer", Reporting, "ReportViewer controls"),
+        new("Microsoft.ReportingServices.ReportViewerControl", Reporting, "ReportViewer controls", Family: "Microsoft.ReportViewer"),
         new("CrystalDecisions", Reporting, "Crystal Reports"),
         new("Ninject.Web", PackageNeedsUpgrade, "→ Microsoft.Extensions.DependencyInjection or Ninject core"),
         new("Autofac.Mvc", PackageNeedsUpgrade, "→ Autofac.Extensions.DependencyInjection", Family: "Autofac"),

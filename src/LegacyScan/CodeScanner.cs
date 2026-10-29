@@ -200,14 +200,14 @@ public static class CodeScanner
 
     private static char Blank(char c) => c == '\n' ? '\n' : ' ';
 
-    /// <summary>Blanks VB.NET comments (' and REM) and strings ("" escapes).</summary>
+    /// <summary>Blanks VB.NET comments (' and REM) and strings ("" escapes). Strings may span lines (VB 14).</summary>
     public static string StripVb(string s)
     {
         var sb = new StringBuilder(s.Length);
+        var inString = false;
         foreach (var rawLine in s.Split('\n'))
         {
             var line = rawLine;
-            var inString = false;
             var lineSb = new StringBuilder(line.Length);
             for (var i = 0; i < line.Length; i++)
             {

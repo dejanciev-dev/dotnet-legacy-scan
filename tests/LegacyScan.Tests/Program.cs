@@ -44,6 +44,13 @@ Test("C# raw strings with 4 quotes and $$ holes", () =>
     True(s.Contains("HttpContext.Current") && s.Contains("Real()"), "code after raw string and in $$ hole kept: " + s);
     Eq(7, s.Split('\n').Length, "line count");
 });
+Test("VB multi-line strings are blanked on every line", () =>
+{
+    var s = CodeScanner.StripVb("Dim sql = \"SELECT 1\nBinaryFormatter here\nend\"\nHttpContext.Current.X()");
+    True(!s.Contains("BinaryFormatter"), "second string line blanked: " + s);
+    True(s.Contains("HttpContext.Current"), "code after string kept: " + s);
+    Eq(4, s.Split('\n').Length, "line count");
+});
 Test("pattern false positives: member Session[], ThreadPool.Resume()", () =>
 {
     bool Hits(Rule rule, string line) => CodeScanner.Patterns.Any(p => p.Rule == rule && p.Regex.IsMatch(line));
@@ -159,6 +166,8 @@ Test("HTML is self-contained, encoded and branded", () =>
     True(html.Contains("&lt;Acme&gt;"), "encoded brand");
     True(html.Contains("mailto:me@example.com"), "mailto");
 });
+Test("collapsed findings are expanded when printing", () =>
+    True(HtmlReport.Render(report, new ReportOptions()).Contains("details::details-content{content-visibility:visible"), "print css"));
 Test("JSON parses", () =>
 {
     using var doc = System.Text.Json.JsonDocument.Parse(JsonReport.Render(report, new ReportOptions()));

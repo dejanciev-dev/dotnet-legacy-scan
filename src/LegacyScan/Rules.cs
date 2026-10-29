@@ -113,41 +113,55 @@ public static class Rules
         0, 0.25, "Use IWebHostEnvironment.ContentRootPath / WebRootPath.");
 
     // ---------- Packages ----------
-    public static readonly Rule PackageNeedsReplacement = new("PKG001", "NuGet package with no modern .NET equivalent (needs replacement)", Severity.Major, "Packages",
-        0, 3, "Find the ASP.NET Core / modern replacement for each listed package.");
+    public static readonly Rule PackageNeedsReplacement = new("PKG001", "NuGet package not supported on modern .NET (needs replacement)", Severity.Major, "Packages",
+        0, 3, "Find the ASP.NET Core / modern replacement for each listed package family.");
 
     public static readonly Rule PackageNeedsUpgrade = new("PKG002", "NuGet package needs a major upgrade or swap to its ASP.NET Core variant", Severity.Minor, "Packages",
         0, 1, "Upgrade to a version that supports netstandard2.0/net8+ or switch to the .AspNetCore / .Extensions.DependencyInjection variant.");
 
-    /// <summary>Known packages: id prefix → (rule, note).</summary>
-    public static readonly (string Prefix, Rule Rule, string Note)[] KnownPackages =
+    /// <summary>
+    /// A known package (matched by id prefix). Packages of the same <see cref="Family"/> are charged once.
+    /// When <see cref="CoveredBy"/> already matched in the project, its cost includes this package and it is skipped.
+    /// </summary>
+    public sealed record KnownPackage(string Prefix, Rule Rule, string Note, Rule? CoveredBy = null, string? Family = null)
+    {
+        public string FamilyKey => Family ?? Prefix;
+    }
+
+    public static readonly KnownPackage[] KnownPackages =
     [
-        ("Microsoft.AspNet.Mvc", PackageNeedsReplacement, "→ ASP.NET Core MVC (built in)"),
-        ("Microsoft.AspNet.WebApi", PackageNeedsReplacement, "→ ASP.NET Core controllers (built in)"),
-        ("Microsoft.AspNet.Web.Optimization", PackageNeedsReplacement, "bundling → WebOptimizer / build-time bundling"),
-        ("Microsoft.AspNet.Razor", PackageNeedsReplacement, "→ ASP.NET Core Razor (built in)"),
-        ("Microsoft.AspNet.WebPages", PackageNeedsReplacement, "→ ASP.NET Core Razor (built in)"),
-        ("Microsoft.AspNet.SignalR", PackageNeedsReplacement, "→ ASP.NET Core SignalR (protocol not compatible: clients must change)"),
-        ("Microsoft.AspNet.Identity", PackageNeedsReplacement, "→ Microsoft.AspNetCore.Identity"),
-        ("Microsoft.Owin", PackageNeedsReplacement, "OWIN middleware → ASP.NET Core middleware"),
-        ("Owin", PackageNeedsReplacement, "OWIN → ASP.NET Core"),
-        ("WebGrease", PackageNeedsReplacement, "bundling → build-time bundling"),
-        ("Microsoft.AspNet.FriendlyUrls", PackageNeedsReplacement, "Web Forms only"),
-        ("Microsoft.AspNet.ScriptManager", PackageNeedsReplacement, "Web Forms only"),
-        ("AjaxControlToolkit", PackageNeedsReplacement, "Web Forms only"),
-        ("Elmah", PackageNeedsReplacement, "→ ILogger + Serilog/Seq/Application Insights"),
-        ("DotNetOpenAuth", PackageNeedsReplacement, "→ ASP.NET Core authentication handlers"),
-        ("Microsoft.ReportViewer", Reporting, "ReportViewer controls"),
-        ("CrystalDecisions", Reporting, "Crystal Reports"),
-        ("Ninject.Web", PackageNeedsUpgrade, "→ Microsoft.Extensions.DependencyInjection or Ninject core"),
-        ("Autofac.Mvc", PackageNeedsUpgrade, "→ Autofac.Extensions.DependencyInjection"),
-        ("Autofac.WebApi", PackageNeedsUpgrade, "→ Autofac.Extensions.DependencyInjection"),
-        ("Unity.Mvc", PackageNeedsUpgrade, "→ Unity.Microsoft.DependencyInjection"),
-        ("Unity.AspNet.WebApi", PackageNeedsUpgrade, "→ Unity.Microsoft.DependencyInjection"),
-        ("Microsoft.ApplicationInsights.Web", PackageNeedsUpgrade, "→ Microsoft.ApplicationInsights.AspNetCore"),
-        ("Swashbuckle.Core", PackageNeedsUpgrade, "→ Swashbuckle.AspNetCore"),
-        ("log4net", PackageNeedsUpgrade, "upgrade to 2.0.10+ (or move to Microsoft.Extensions.Logging)"),
+        new("Microsoft.AspNet.Mvc", PackageNeedsReplacement, "→ ASP.NET Core MVC (built in)", Mvc5),
+        new("Microsoft.AspNet.WebApi", PackageNeedsReplacement, "→ ASP.NET Core controllers (built in)", WebApi2),
+        new("Microsoft.AspNet.Web.Optimization", PackageNeedsReplacement, "bundling → WebOptimizer / build-time bundling", Mvc5),
+        new("Microsoft.AspNet.Razor", PackageNeedsReplacement, "→ ASP.NET Core Razor (built in)", Mvc5, "Microsoft.AspNet.Razor"),
+        new("Microsoft.AspNet.WebPages", PackageNeedsReplacement, "→ ASP.NET Core Razor (built in)", Mvc5, "Microsoft.AspNet.Razor"),
+        new("Microsoft.AspNet.SignalR", PackageNeedsReplacement, "→ ASP.NET Core SignalR (protocol not compatible: clients must change)"),
+        new("Microsoft.AspNet.Identity", PackageNeedsReplacement, "→ Microsoft.AspNetCore.Identity", AspNetIdentity2),
+        new("Microsoft.Owin", PackageNeedsReplacement, "OWIN middleware → ASP.NET Core middleware"),
+        new("Owin", PackageNeedsReplacement, "OWIN → ASP.NET Core", Family: "Microsoft.Owin"),
+        new("WebGrease", PackageNeedsReplacement, "bundling → build-time bundling", Mvc5, "Microsoft.AspNet.Web.Optimization"),
+        new("Microsoft.AspNet.FriendlyUrls", PackageNeedsReplacement, "Web Forms only", WebForms, "WebForms"),
+        new("Microsoft.AspNet.ScriptManager", PackageNeedsReplacement, "Web Forms only", WebForms, "WebForms"),
+        new("AjaxControlToolkit", PackageNeedsReplacement, "Web Forms only", WebForms, "WebForms"),
+        new("Elmah", PackageNeedsReplacement, "→ ILogger + Serilog/Seq/Application Insights"),
+        new("DotNetOpenAuth", PackageNeedsReplacement, "→ ASP.NET Core authentication handlers"),
+        new("Microsoft.ReportViewer", Reporting, "ReportViewer controls"),
+        new("CrystalDecisions", Reporting, "Crystal Reports"),
+        new("Ninject.Web", PackageNeedsUpgrade, "→ Microsoft.Extensions.DependencyInjection or Ninject core"),
+        new("Autofac.Mvc", PackageNeedsUpgrade, "→ Autofac.Extensions.DependencyInjection", Family: "Autofac"),
+        new("Autofac.WebApi", PackageNeedsUpgrade, "→ Autofac.Extensions.DependencyInjection", Family: "Autofac"),
+        new("Unity.Mvc", PackageNeedsUpgrade, "→ Unity.Microsoft.DependencyInjection", Family: "Unity"),
+        new("Unity.AspNet.WebApi", PackageNeedsUpgrade, "→ Unity.Microsoft.DependencyInjection", Family: "Unity"),
+        new("Microsoft.ApplicationInsights.Web", PackageNeedsUpgrade, "→ Microsoft.ApplicationInsights.AspNetCore"),
+        new("Swashbuckle.Core", PackageNeedsUpgrade, "→ Swashbuckle.AspNetCore"),
+        new("log4net", PackageNeedsUpgrade, "upgrade to 2.0.10+ (or move to Microsoft.Extensions.Logging)"),
     ];
+
+    /// <summary>Packages that match a known prefix but already support netstandard2.0 / modern .NET.</summary>
+    public static readonly HashSet<string> SupportedOnModern = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Microsoft.AspNet.WebApi.Client", "Microsoft.AspNet.SignalR.Client",
+    };
 
     public static IEnumerable<Rule> All =>
         typeof(Rules).GetFields().Where(f => f.FieldType == typeof(Rule)).Select(f => (Rule)f.GetValue(null)!);

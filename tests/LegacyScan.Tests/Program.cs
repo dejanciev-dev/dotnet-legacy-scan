@@ -81,13 +81,24 @@ Test("Admin: MVC controller excludes ApiController, Web API found, Identity/OWIN
     Eq(1, F("LegacyShop.Admin", Rules.Mvc5)!.Occurrences.Count, "mvc controllers");
     Eq(1, F("LegacyShop.Admin", Rules.WebApi2)!.Occurrences.Count, "api controllers");
     True(F("LegacyShop.Admin", Rules.AspNetIdentity2) is not null, "identity");
-    Eq(5, F("LegacyShop.Admin", Rules.PackageNeedsReplacement)!.Occurrences.Count, "packages to replace");
+    // MVC, Web API, Identity and bundling packages are part of APP003/APP005/SEC002; only the OWIN family is left.
+    var pkg = F("LegacyShop.Admin", Rules.PackageNeedsReplacement)!;
+    Eq(1, pkg.Occurrences.Count, "package families to replace");
+    True(pkg.Occurrences[0].Snippet.StartsWith("Microsoft.Owin.Security.Cookies"), pkg.Occurrences[0].Snippet);
+});
+Test("Web: Web Forms-only packages are part of APP001, not charged again", () =>
+{
+    var pkg = F("LegacyShop.Web", Rules.PackageNeedsReplacement)!;
+    Eq(1, pkg.Occurrences.Count, "package families");
+    True(pkg.Occurrences[0].Snippet.StartsWith("Elmah"), pkg.Occurrences[0].Snippet);
 });
 Test("Reports (VB): Crystal via assembly reference, Thread.Abort once (comment ignored)", () =>
 {
     True(F("LegacyShop.Reports", Rules.Reporting) is not null, "crystal");
     Eq(1, F("LegacyShop.Reports", Rules.ThreadAbort)!.Occurrences.Count, "abort");
 });
+Test("Reports: library with a blocker is not called a good first candidate", () =>
+    True(!P("LegacyShop.Reports").RecommendedTarget.Contains("Good first candidate"), P("LegacyShop.Reports").RecommendedTarget));
 
 Console.WriteLine("Estimate");
 Test("dependencies come first in migration order", () =>
@@ -123,6 +134,70 @@ Test("JSON parses", () =>
     using var doc = System.Text.Json.JsonDocument.Parse(JsonReport.Render(report, new ReportOptions()));
     Eq(7, doc.RootElement.GetProperty("projects").GetArrayLength());
 });
+
+Console.WriteLine("Edge cases");
+var temp = Path.Combine(Path.GetTempPath(), "legacyscan-tests-" + Guid.NewGuid().ToString("N"));
+string Fixture(string relPath, string content)
+{
+    var full = Path.Combine(temp, relPath);
+    Directory.CreateDirectory(Path.GetDirectoryName(full)!);
+    File.WriteAllText(full, content);
+    return full;
+}
+const string LegacyProject = """<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003"><PropertyGroup><TargetFrameworkVersion>v4.8</TargetFrameworkVersion></PropertyGroup>{0}</Project>""";
+string Legacy(string items = "") => LegacyProject.Replace("{0}", items);
+try
+{
+    Test("projects with the same name do not crash and keep their references", () =>
+    {
+        Fixture("dup/a/Core/Core.csproj", Legacy());
+        Fixture("dup/b/Core/Core.csproj", Legacy());
+        Fixture("dup/a/App/App.csproj", Legacy("""<ItemGroup><ProjectReference Include="..\..\b\Core\Core.csproj" /></ItemGroup>"""));
+        var r = Scanner.Scan(Path.Combine(temp, "dup"));
+        Eq(3, r.Projects.Select(p => p.Name).Distinct().Count(), "unique names");
+        var coreB = r.Projects.Single(p => p.Name.StartsWith("Core") && p.Path.StartsWith("b")).Name;
+        Eq(coreB, r.Projects.Single(p => p.Name == "App").ProjectReferences.Single(), "reference re-pointed");
+        True(r.MigrationOrder.IndexOf(coreB) < r.MigrationOrder.IndexOf("App"), "dependency first");
+        True(HtmlReport.Render(r, new ReportOptions()).Contains(coreB), "html renders");
+    });
+    Test("malformed .slnx is a clean error, not a crash", () =>
+        Eq(1, Cli.Run([Fixture("bad/Bad.slnx", "<Solution><Project Path=\"x.csproj\""), "-q", "-o", Path.Combine(temp, "bad.html")])));
+    Test("test project referencing MVC is a test project", () =>
+    {
+        var path = Fixture("mvctest/Web.Tests/Web.Tests.csproj", Legacy("""<ItemGroup><Reference Include="System.Web.Mvc, Version=5.2.3.0" /><Reference Include="Microsoft.VisualStudio.QualityTools.UnitTestFramework" /></ItemGroup>"""));
+        var p = ProjectAnalyzer.Analyze(path, temp);
+        Eq(ProjectKind.Test, p.Kind);
+        True(p.Findings.All(f => f.Rule != Rules.Mvc5), "no MVC finding");
+    });
+    Test("multi-targeted net48;net10.0 project is already modern", () =>
+    {
+        var path = Fixture("multi/Multi/Multi.csproj", """<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFrameworks>net48;net10.0</TargetFrameworks></PropertyGroup></Project>""");
+        True(ProjectAnalyzer.Analyze(path, temp).IsModernAlready, "modern");
+    });
+    Test("target framework is read from Directory.Build.props", () =>
+    {
+        Fixture("props/Directory.Build.props", "<Project><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>");
+        var p = ProjectAnalyzer.Analyze(Fixture("props/src/Lib/Lib.csproj", """<Project Sdk="Microsoft.NET.Sdk"></Project>"""), temp);
+        Eq("net10.0", p.TargetFramework);
+        True(p.IsModernAlready, "modern");
+    });
+    Test("unresolvable target framework produces a warning", () =>
+    {
+        var warnings = new List<string>();
+        ProjectAnalyzer.Analyze(Fixture("prop2/Lib/Lib.csproj", """<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>$(LibTfm)</TargetFramework></PropertyGroup></Project>"""), temp, warnings);
+        Eq(1, warnings.Count, "warnings");
+    });
+    Test("packages that support modern .NET are not flagged", () =>
+    {
+        Fixture("client/Client/packages.config", """<packages><package id="Microsoft.AspNet.WebApi.Client" version="5.2.7" /></packages>""");
+        var p = ProjectAnalyzer.Analyze(Fixture("client/Client/Client.csproj", Legacy()), temp);
+        True(p.Findings.All(f => f.Rule != Rules.PackageNeedsReplacement), "WebApi.Client is netstandard2.0");
+    });
+}
+finally
+{
+    try { Directory.Delete(temp, recursive: true); } catch (IOException) { }
+}
 
 Console.WriteLine($"\n{passed} passed, {failures} failed");
 return failures == 0 ? 0 : 1;

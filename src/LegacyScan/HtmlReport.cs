@@ -66,7 +66,7 @@ public static class HtmlReport
         }
 
         // ---------- Order ----------
-        var byName = r.Projects.ToDictionary(p => p.Name, StringComparer.OrdinalIgnoreCase);
+        var byName = r.Projects.GroupBy(p => p.Name, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
         sb.Append("<section><h2>Recommended migration order</h2><p class=\"muted\">Dependencies first. Shared libraries are multi-targeted so the old and the new application can run side by side during the migration.</p><ol class=\"order\">");
         foreach (var name in r.MigrationOrder)
         {

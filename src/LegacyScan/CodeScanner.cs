@@ -32,6 +32,7 @@ public static class CodeScanner
         new(Rules.HttpRuntimeCache, R(@"\bHttpRuntime\.Cache\b|\bSystem\.Web\.Caching\b")),
         new(Rules.ServerMapPath, R(@"\bServer\.MapPath\b|\bHostingEnvironment\.MapPath\b")),
         new(Rules.SystemDataSqlClient, R(@"\bSystem\.Data\.SqlClient\b")),
+        new(Rules.RemovedApis, R(@"\bWindowsImpersonationContext\b|\bWindowsIdentity\b.*\.Impersonate\s*\(|\bAssembly\.ReflectionOnlyLoad(From)?\b")),
         new(Rules.HttpModulesHandlers, R(@"(:|Implements)\s*([\w.]+\s*,\s*)*(IHttpModule|IHttpHandler|IHttpAsyncHandler)\b")),
         new(Rules.WcfClient, R(@"\bClientBase\s*(<|\(Of)|\bChannelFactory\s*(<|\(Of)")),
         // Session[...] on the page/controller, not someObject.Session[...]

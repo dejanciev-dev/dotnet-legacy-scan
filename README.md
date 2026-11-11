@@ -51,6 +51,10 @@ The console shows a summary and writes `legacy-scan-report.html`:
   Findings:     6 blocker · 15 major · 20 minor
   Difficulty:   High (complexity 79/100)
   Effort:       42–88 developer days (rough estimate)
+  Blocker:      ASP.NET Web Forms pages ×3 (LegacyShop.Web)
+  Blocker:      ASP.NET Membership / Forms Authentication / Roles ×3 (LegacyShop.Web)
+  Blocker:      WCF service hosting (.svc / system.serviceModel services) ×2 (LegacyShop.Services)
+                …and 3 more in the report
 
   Report:       /work/legacy-scan-report.html
 ```
@@ -170,7 +174,7 @@ Generated code (`*.Designer.cs`, `*.g.cs`, `Service References`, `Web References
 
 ## Rules
 
-37 rules. Hours are heuristics for an experienced .NET developer, before testing (see the [estimate](#how-the-estimate-is-calculated)). The guidance shown in the report for each rule is in [`Rules.cs`](src/LegacyScan/Rules.cs).
+38 rules. Hours are heuristics for an experienced .NET developer, before testing (see the [estimate](#how-the-estimate-is-calculated)). The guidance shown in the report for each rule is in [`Rules.cs`](src/LegacyScan/Rules.cs).
 
 | ID | Rule | Severity | Base h | Per occurrence h |
 |---|---|---|---:|---:|
@@ -198,6 +202,7 @@ Generated code (`*.Designer.cs`, `*.g.cs`, `Service References`, `Web References
 | CODE010 | Windows-only APIs (Registry, System.Drawing, EventLog, WMI) | Info | 0 | 0.1 |
 | CODE011 | HttpRuntime.Cache / System.Web.Caching | Minor | 0 | 0.5 |
 | CODE012 | Server.MapPath / HostingEnvironment | Minor | 0 | 0.25 |
+| CODE013 | APIs removed on modern .NET (WindowsIdentity.Impersonate, reflection-only loading) | Major | 0 | 1 |
 | DATA001 | Entity Framework EDMX model (database-first designer) | Major | 4 | 8 |
 | DATA002 | Entity Framework 6 | Minor | 2 | 0 |
 | DATA003 | System.Data.SqlClient | Minor | 0 | 0.1 |

@@ -115,6 +115,9 @@ public static class Rules
     public static readonly Rule ServerMapPath = new("CODE012", "Server.MapPath / HostingEnvironment", Severity.Minor, "Code",
         0, 0.25, "Use IWebHostEnvironment.ContentRootPath / WebRootPath.");
 
+    public static readonly Rule RemovedApis = new("CODE013", "APIs removed on modern .NET (WindowsIdentity.Impersonate, reflection-only loading)", Severity.Major, "Code",
+        0, 1, "Impersonation: use WindowsIdentity.RunImpersonated(token, () => …). Reflection-only loading: use System.Reflection.MetadataLoadContext.");
+
     // ---------- Packages ----------
     public static readonly Rule PackageNeedsReplacement = new("PKG001", "NuGet package not supported on modern .NET (needs replacement)", Severity.Major, "Packages",
         0, 3, "Find the ASP.NET Core / modern replacement for each listed package family.");

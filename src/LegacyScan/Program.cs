@@ -66,7 +66,7 @@ internal static class Cli
                         options.HoursPerDay = double.Parse(Next(), System.Globalization.CultureInfo.InvariantCulture);
                         if (options.HoursPerDay is <= 0 or > 24) throw new ArgumentException("--hours-per-day must be between 0 and 24");
                         break;
-                    case "--fail-on": failOn = Enum.Parse<Severity>(Next(), ignoreCase: true); break;
+                    case "--fail-on": failOn = ParseSeverity(Next()); break;
                     case "-q" or "--quiet": quiet = true; break;
                     default:
                         if (args[i].StartsWith('-')) throw new ArgumentException($"Unknown option {args[i]}");
@@ -116,6 +116,10 @@ internal static class Cli
         Console.WriteLine($"  Findings:     {r.CountBySeverity(Severity.Blocker)} blocker · {r.CountBySeverity(Severity.Major)} major · {r.CountBySeverity(Severity.Minor)} minor");
         Console.WriteLine($"  Difficulty:   {r.Difficulty} (complexity {r.Score}/100)");
         Console.WriteLine($"  Effort:       {Days(r.EstimatedHoursLow, o)}–{Days(r.EstimatedHoursHigh, o)} developer days (rough estimate)");
+        var blockers = r.BlockerGroups();
+        foreach (var (rule, count, projects) in blockers.Take(MaxBlockersShown))
+            Console.WriteLine($"  Blocker:      {rule.Title} ×{count} ({string.Join(", ", projects)})");
+        if (blockers.Count > MaxBlockersShown) Console.WriteLine($"                …and {blockers.Count - MaxBlockersShown} more in the report");
         foreach (var w in r.Warnings) Console.WriteLine($"  warning: {w}");
         Console.WriteLine();
         Console.WriteLine($"  Report:       {Path.GetFullPath(html)}");
@@ -123,6 +127,17 @@ internal static class Cli
         if (md is not null) Console.WriteLine($"  Markdown:     {Path.GetFullPath(md)}");
         Console.WriteLine();
     }
+
+    private const int MaxBlockersShown = 3;
+
+    /// <summary>Only the severity names: Enum.Parse would also accept "5" or "info" and its error does not list the choices.</summary>
+    internal static Severity ParseSeverity(string value) => value.ToLowerInvariant() switch
+    {
+        "minor" => Severity.Minor,
+        "major" => Severity.Major,
+        "blocker" => Severity.Blocker,
+        _ => throw new ArgumentException($"Invalid --fail-on value '{value}' (expected minor, major or blocker)"),
+    };
 
     internal static string Days(double hours, ReportOptions o) => Math.Ceiling(hours / o.HoursPerDay).ToString("N0", System.Globalization.CultureInfo.InvariantCulture);
 }

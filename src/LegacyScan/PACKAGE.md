@@ -25,4 +25,4 @@ Useful options: `--json <file>`, `--md <file>` (e.g. `"$GITHUB_STEP_SUMMARY"`), 
 
 The effort range is a heuristic starting point for planning, not a quote.
 
-How it works, the 37 rules, the estimate formula and the limitations are documented on [GitHub](https://github.com/dejanciev-dev/dotnet-legacy-scan#readme). False-positive reports are very welcome as [issues](https://github.com/dejanciev-dev/dotnet-legacy-scan/issues).
+How it works, the 38 rules, the estimate formula and the limitations are documented on [GitHub](https://github.com/dejanciev-dev/dotnet-legacy-scan#readme). False-positive reports are very welcome as [issues](https://github.com/dejanciev-dev/dotnet-legacy-scan/issues).

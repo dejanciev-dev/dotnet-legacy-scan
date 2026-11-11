@@ -60,6 +60,14 @@ Test("pattern false positives: member Session[], ThreadPool.Resume()", () =>
     True(Hits(Rules.ThreadAbort, "_workerThread.Abort();"), "thread variable");
     True(!Hits(Rules.ThreadAbort, "myThreadPool.Resume();"), "ThreadPool ignored");
 });
+Test("removed APIs: impersonation and reflection-only loading", () =>
+{
+    bool Hits(string line) => CodeScanner.Patterns.Any(p => p.Rule == Rules.RemovedApis && p.Regex.IsMatch(line));
+    True(Hits("using (WindowsImpersonationContext ctx = id.Impersonate())"), "impersonation context");
+    True(Hits("var ctx = WindowsIdentity.GetCurrent().Impersonate();"), "WindowsIdentity.Impersonate");
+    True(Hits("var a = Assembly.ReflectionOnlyLoadFrom(path);"), "ReflectionOnlyLoadFrom");
+    True(!Hits("WindowsIdentity.RunImpersonated(token, () => Work());"), "RunImpersonated is the replacement");
+});
 Test("generated code is counted as lines but not scanned", () =>
 {
     True(CodeScanner.IsGenerated("Service References/Pay/Reference.cs"), "service reference");
@@ -195,6 +203,22 @@ Test("--exclude skips projects by name or path and says so", () =>
     True(r.Warnings.Any(w => w.StartsWith("Excluded by --exclude (2)")), string.Join("; ", r.Warnings));
 });
 Test("--version prints the version", () => Eq(0, Cli.Run(["--version"])));
+Test("--fail-on accepts only severity names", () =>
+{
+    Eq(Severity.Blocker, Cli.ParseSeverity("Blocker"), "case-insensitive");
+    foreach (var bad in new[] { "5", "info", "critical" })
+    {
+        try { Cli.ParseSeverity(bad); throw new Exception($"'{bad}' accepted"); }
+        catch (ArgumentException ex) { True(ex.Message.Contains("minor, major or blocker"), ex.Message); }
+    }
+    Eq(1, Cli.Run([sample, "-q", "--fail-on", "critical"]), "clean error exit code");
+});
+Test("--fail-on blocker exits with 2 on the sample", () =>
+{
+    var html = Path.Combine(Path.GetTempPath(), $"legacyscan-failon-{Guid.NewGuid():N}.html");
+    try { Eq(2, Cli.Run([sample, "-q", "-o", html, "--fail-on", "blocker"])); }
+    finally { File.Delete(html); }
+});
 Test("collapsed findings are expanded when printing", () =>
     True(HtmlReport.Render(report, new ReportOptions()).Contains("details::details-content{content-visibility:visible"), "print css"));
 Test("JSON parses", () =>
